@@ -76,6 +76,7 @@ const handleLogout = () => {
   z-index: 100000;
   height: 60px;
   background-color: var(--el-bg-color-overlay);
+  border: 2px solid var(--el-border-color);
 
   .header-content {
     display: flex;

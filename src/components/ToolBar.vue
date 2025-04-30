@@ -92,7 +92,7 @@ import { computed } from 'vue'
 
 const drawingStore = useDrawingStore()
 
-const predefinedColors = ['#000000', '#ff0000', '#00aa00', '#0000ff', '#ffaa00', '#800080']
+const predefinedColors = ['#000000', '#ffffff', '#00aa00', '#0000ff', '#ffaa00', '#800080']
 
 const eraser = computed(() => drawingStore.eraser)
 const strokeType = computed(() => drawingStore.strokeType)
@@ -140,7 +140,7 @@ const isActive = (type: string) => {
     max-width: 1200px;
     width: 100%;
     background-color: var(--el-bg-color);
-    border: 1px solid var(--el-border-color);
+    border: 2px solid var(--el-border-color);
     border-radius: 12px;
     box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.1);
     padding: 0.5rem 1rem;

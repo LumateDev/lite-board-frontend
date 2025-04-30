@@ -25,7 +25,7 @@ let currentStroke: Stroke | null = null
 
 const strokes = ref<Stroke[]>([])
 const undoneStrokes = ref<Stroke[]>([])
-
+//TODO : Вынести в настройки для микрочела
 const GRID_SIZE = 20
 const isDarkTheme = ref(false)
 
@@ -45,24 +45,49 @@ function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number) 
   const thinLineColor = getComputedStyleVar('--el-border-color-lighter') || '#ccc'
   const boldLineColor = getComputedStyleVar('--el-border-color') || '#999'
 
-  for (let x = 0; x < width; x += GRID_SIZE) {
+  const baseGridSize = GRID_SIZE // логический размер, напр. 100
+  const minPixelSpacing = 20 // минимальный размер сетки на экране
+
+  // адаптивный масштаб: чем меньше зум, тем реже сетка
+  let step = baseGridSize
+  while (step * drawingStore.scale < minPixelSpacing) {
+    step *= 2 // делаем сетку реже
+  }
+
+  ctx.save()
+  ctx.translate(drawingStore.panX, drawingStore.panY)
+  ctx.scale(drawingStore.scale, drawingStore.scale)
+
+  const logicalWidth = width / drawingStore.scale
+  const logicalHeight = height / drawingStore.scale
+
+  const startX = Math.floor(-drawingStore.panX / drawingStore.scale / step) * step
+  const startY = Math.floor(-drawingStore.panY / drawingStore.scale / step) * step
+
+  const endX = startX + logicalWidth + step
+  const endY = startY + logicalHeight + step
+
+  for (let x = startX; x < endX; x += step) {
     ctx.beginPath()
-    ctx.moveTo(x, 0)
-    ctx.lineTo(x, height)
-    ctx.strokeStyle = (x / GRID_SIZE) % 5 === 0 ? boldLineColor : thinLineColor
-    ctx.lineWidth = (x / GRID_SIZE) % 5 === 0 ? 1.5 : 0.7
+    ctx.moveTo(x, startY)
+    ctx.lineTo(x, endY)
+    ctx.strokeStyle = (x / step) % 5 === 0 ? boldLineColor : thinLineColor
+    ctx.lineWidth = 1
     ctx.stroke()
   }
 
-  for (let y = 0; y < height; y += GRID_SIZE) {
+  for (let y = startY; y < endY; y += step) {
     ctx.beginPath()
-    ctx.moveTo(0, y)
-    ctx.lineTo(width, y)
-    ctx.strokeStyle = (y / GRID_SIZE) % 5 === 0 ? boldLineColor : thinLineColor
-    ctx.lineWidth = (y / GRID_SIZE) % 5 === 0 ? 1.5 : 0.7
+    ctx.moveTo(startX, y)
+    ctx.lineTo(endX, y)
+    ctx.strokeStyle = (y / step) % 5 === 0 ? boldLineColor : thinLineColor
+    ctx.lineWidth = 1
     ctx.stroke()
   }
+
+  ctx.restore()
 }
+
 
 function redraw() {
   const canvas = canvasRef.value
@@ -81,16 +106,30 @@ function redraw() {
   ctx.scale(drawingStore.scale, drawingStore.scale)
 
   for (const stroke of strokes.value) {
-    if (stroke.points.length < 2) continue
-    ctx.beginPath()
-    ctx.moveTo(stroke.points[0].x, stroke.points[0].y)
-    for (const point of stroke.points.slice(1)) {
-      ctx.lineTo(point.x, point.y)
-    }
+    const points = stroke.points
+    if (points.length === 0) continue
+
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
     ctx.strokeStyle = stroke.color
+    ctx.fillStyle = stroke.color
     ctx.lineWidth = stroke.width
-    ctx.stroke()
+
+    if (points.length === 1) {
+      const p = points[0]
+      ctx.beginPath()
+      ctx.arc(p.x, p.y, stroke.width / 2, 0, Math.PI * 2)
+      ctx.fill()
+    } else {
+      ctx.beginPath()
+      ctx.moveTo(points[0].x, points[0].y)
+      for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(points[i].x, points[i].y)
+      }
+      ctx.stroke()
+    }
   }
+
 
   ctx.restore()
 }
@@ -129,25 +168,36 @@ function draw(e: MouseEvent) {
 }
 
 function drawCurrentStroke() {
-  if (!ctx || !currentStroke || currentStroke.points.length < 2) return
+  if (!ctx || !currentStroke || currentStroke.points.length === 0) return
 
   ctx.save()
   ctx.translate(drawingStore.panX, drawingStore.panY)
   ctx.scale(drawingStore.scale, drawingStore.scale)
 
-  ctx.beginPath()
-  ctx.moveTo(currentStroke.points[0].x, currentStroke.points[0].y)
-  for (const point of currentStroke.points.slice(1)) {
-    ctx.lineTo(point.x, point.y)
-  }
-  ctx.strokeStyle = currentStroke.color
-  ctx.lineWidth = currentStroke.width
+  const points = currentStroke.points
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
-  ctx.stroke()
+  ctx.strokeStyle = currentStroke.color
+  ctx.fillStyle = currentStroke.color
+  ctx.lineWidth = currentStroke.width
+
+  if (points.length === 1) {
+    const p = points[0]
+    ctx.beginPath()
+    ctx.arc(p.x, p.y, currentStroke.width / 2, 0, Math.PI * 2)
+    ctx.fill()
+  } else {
+    ctx.beginPath()
+    ctx.moveTo(points[0].x, points[0].y)
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y)
+    }
+    ctx.stroke()
+  }
 
   ctx.restore()
 }
+
 
 function stopDrawing() {
   if (drawing && currentStroke) {
@@ -256,8 +306,6 @@ function updatePenColorOnThemeChange(dark: boolean) {
   }
 }
 
-defineExpose({ clearCanvas })
-
 onMounted(() => {
   resizeCanvas()
   drawingStore.registerClear(clearCanvas)
@@ -333,7 +381,7 @@ onMounted(() => {
 
   window.addEventListener('resize', resizeCanvas)
 
-  // 🎨 Автоинверсия при смене темы
+  // Автоинверсия при смене темы
   themeObserver = new MutationObserver(() => {
     const dark = document.documentElement.classList.contains('dark')
     isDarkTheme.value = dark
