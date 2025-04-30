@@ -13,6 +13,8 @@ const canvasRef = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 let drawing = false
 let currentStroke: Stroke | null = null
+const erasedStrokes = ref<Stroke[]>([])
+
 
 const strokes = ref<Stroke[]>([])
 const undoneStrokes = ref<Stroke[]>([])
@@ -144,19 +146,25 @@ function startDrawing(e: MouseEvent) {
 }
 
 function draw(e: MouseEvent) {
+  const { x, y } = getCursorPosition(e)
+
+  if (drawingStore.eraser) {
+    eraseAt(x, y)
+    return
+  }
+
   if (!ctx || !currentStroke || drawingStore.strokeType === 'hand') return
 
-  const { x, y } = getCursorPosition(e)
   currentStroke.points.push({ x, y })
-
-  currentStroke.color = drawingStore.eraser
-    ? getComputedStyleVar('--el-bg-color') || '#ffffff'
-    : drawingStore.color
+  currentStroke.color = drawingStore.color
   currentStroke.width = drawingStore.lineWidth
 
-  redraw()
-  drawCurrentStroke()
+  if (currentStroke.points.length > 1) {
+    redraw()
+    drawCurrentStroke()
+  }
 }
+
 
 function drawCurrentStroke() {
   if (!ctx || !currentStroke || currentStroke.points.length === 0) return
@@ -191,15 +199,22 @@ function drawCurrentStroke() {
 
 
 function stopDrawing() {
+  if (drawingStore.eraser) {
+    drawing = false
+    return
+  }
+
   if (drawing && currentStroke) {
     strokes.value.push(currentStroke)
     undoneStrokes.value = []
     saveStrokes()
     currentStroke = null
   }
+
   drawing = false
   redraw()
 }
+
 
 function saveStrokes() {
   localStorage.setItem('board_strokes', JSON.stringify(strokes.value))
@@ -258,7 +273,37 @@ function onWheel(e: WheelEvent) {
   drawingStore.setPan(newPanX, newPanY)
 }
 
+function eraseAt(x: number, y: number) {
+  const threshold = drawingStore.lineWidth / drawingStore.scale
+
+  for (let i = strokes.value.length - 1; i >= 0; i--) {
+    const stroke = strokes.value[i]
+    for (const p of stroke.points) {
+      const dx = p.x - x
+      const dy = p.y - y
+      const dist = Math.sqrt(dx * dx + dy * dy)
+      if (dist <= threshold) {
+        const removed = strokes.value.splice(i, 1)[0]
+        erasedStrokes.value.push(removed)
+        undoneStrokes.value = [] // сброс redo
+        saveStrokes()
+        redraw()
+        return
+      }
+    }
+  }
+}
+
+
 function undo() {
+  if (erasedStrokes.value.length > 0) {
+    const restored = erasedStrokes.value.pop()!
+    strokes.value.push(restored)
+    saveStrokes()
+    redraw()
+    return
+  }
+
   if (strokes.value.length > 0) {
     const last = strokes.value.pop()!
     undoneStrokes.value.push(last)
@@ -275,6 +320,7 @@ function redo() {
     redraw()
   }
 }
+
 
 // Автосмена цвета пера при переключении темы
 function updatePenColorOnThemeChange(dark: boolean) {
