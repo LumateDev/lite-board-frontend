@@ -5,18 +5,9 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useDrawingStore } from '@/stores/useDrawingStore'
+import type { Stroke } from '@/interfaces.ts'
 
-interface Point {
-  x: number
-  y: number
-}
 
-interface Stroke {
-  points: Point[]
-  color: string
-  width: number
-  type: string
-}
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null

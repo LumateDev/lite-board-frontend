@@ -11,4 +11,7 @@ export interface Point {
 
 export interface Stroke {
   points: Point[]
+  color: string
+  width: number
+  type: string
 }
