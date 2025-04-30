@@ -137,7 +137,7 @@ const isActive = (type: string) => {
 
   .sidebar-container {
     pointer-events: all;
-    max-width: 1200px;
+    max-width: 600px;
     width: 100%;
     background-color: var(--el-bg-color);
     border: 2px solid var(--el-border-color);

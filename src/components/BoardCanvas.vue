@@ -17,6 +17,7 @@ const erasedStrokes = ref<Stroke[]>([])
 
 
 const strokes = ref<Stroke[]>([])
+const redoErasedStrokes = ref<Stroke[]>([])
 const undoneStrokes = ref<Stroke[]>([])
 //TODO : Вынести в настройки для микрочела
 const GRID_SIZE = 20
@@ -149,7 +150,9 @@ function draw(e: MouseEvent) {
   const { x, y } = getCursorPosition(e)
 
   if (drawingStore.eraser) {
-    eraseAt(x, y)
+    if (drawing) {
+      eraseAt(x, y)
+    }
     return
   }
 
@@ -298,6 +301,7 @@ function eraseAt(x: number, y: number) {
 function undo() {
   if (erasedStrokes.value.length > 0) {
     const restored = erasedStrokes.value.pop()!
+    redoErasedStrokes.value.push(restored)
     strokes.value.push(restored)
     saveStrokes()
     redraw()
@@ -313,6 +317,15 @@ function undo() {
 }
 
 function redo() {
+  if (redoErasedStrokes.value.length > 0) {
+    const reErased = redoErasedStrokes.value.pop()!
+    strokes.value = strokes.value.filter(s => s !== reErased)
+    erasedStrokes.value.push(reErased)
+    saveStrokes()
+    redraw()
+    return
+  }
+
   if (undoneStrokes.value.length > 0) {
     const restored = undoneStrokes.value.pop()!
     strokes.value.push(restored)
@@ -364,20 +377,23 @@ onMounted(() => {
     if (e.button === 2) {
       // ПКМ — временная "рука"
       e.preventDefault()
-      drawingStore.setTempHand(true) // Подсветить кнопку "рука"
+      drawingStore.setTempHand(true)
       isPanning = true
       lastPanX = e.clientX
       lastPanY = e.clientY
     } else if (drawingStore.strokeType === 'hand') {
-      // Из тулбара — постоянная "рука"
       isPanning = true
       lastPanX = e.clientX
       lastPanY = e.clientY
     } else {
-      // Любой другой инструмент
-      startDrawing(e)
+      // ЛКМ — любой другой инструмент, включая ластик
+      drawing = true
+      if (!drawingStore.eraser) {
+        startDrawing(e)
+      }
     }
   })
+
 
   // Движение мыши
   canvas.addEventListener('mousemove', (e) => {
@@ -388,10 +404,14 @@ onMounted(() => {
       lastPanX = e.clientX
       lastPanY = e.clientY
       redraw()
+    } else if (drawingStore.eraser && drawing) {
+      const { x, y } = getCursorPosition(e)
+      eraseAt(x, y)
     } else {
       draw(e)
     }
   })
+
 
   // Отпускание кнопок
   canvas.addEventListener('mouseup', (e) => {
