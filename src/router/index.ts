@@ -4,6 +4,7 @@ import AuthPage from '@/pages/AuthPage.vue'
 import ErrorPage from '@/pages/ErrorPage.vue'
 import SettingsPage from '@/pages/SettingsPage.vue'
 import AboutPage from '@/pages/AboutPage.vue'
+import BoardPage from '@/pages/BoardPage.vue'
 import { useUserStore } from '@/stores/user'
 
 const router = createRouter({
@@ -15,7 +16,7 @@ const router = createRouter({
         const userStore = useUserStore()
         // Если пользователь авторизован, перенаправляем на /home
         return userStore.isAuthenticated ? '/home' : '/auth'
-      }
+      },
     },
     {
       path: '/home',
@@ -41,13 +42,20 @@ const router = createRouter({
       component: SettingsPage,
       meta: { requiresAuth: true },
     },
+
+    {
+      path: '/board/:id',
+      name: 'board',
+      component: BoardPage,
+      meta: { requiresAuth: true },
+    }, // <--- Новый маршрут для доски
     // Страница ошибки 404
     {
       path: '/:pathMatch(.*)*',
       name: 'error',
-      component: ErrorPage
-    }
-  ]
+      component: ErrorPage,
+    },
+  ],
 })
 
 router.beforeEach((to, from, next) => {
@@ -64,8 +72,7 @@ router.beforeEach((to, from, next) => {
   // Если пользователь авторизован и пытается попасть на /auth, перенаправляем на /home
   else if (to.meta.requiresGuest && userStore.isAuthenticated) {
     next('/home')
-  }
-  else {
+  } else {
     next() // продолжаем переход
   }
 })

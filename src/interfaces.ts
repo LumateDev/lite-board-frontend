@@ -3,3 +3,12 @@ export interface Board {
   name: string
   lastUpdated: string
 }
+
+export interface Point {
+  x: number
+  y: number
+}
+
+export interface Stroke {
+  points: Point[]
+}

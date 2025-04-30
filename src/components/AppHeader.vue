@@ -1,25 +1,15 @@
 <template>
   <el-header class="app-header">
     <div class="header-content">
-      <router-link to="/home" class="logo-link">
-        Lite Board
-      </router-link>
+      <router-link to="/home" class="logo-link"> Lite Board </router-link>
 
       <nav class="nav-links">
-        <router-link to="/home" class="nav-link">
-          Home
-        </router-link>
-        <router-link to="/about" class="nav-link">
-          About
-        </router-link>
+        <router-link to="/home" class="nav-link"> Home </router-link>
+        <router-link to="/about" class="nav-link"> About </router-link>
 
-        <router-link to="/Teams" class="nav-link">
-          Teams
-        </router-link>
-<!--       Test board-->
-        <router-link to="/TestBoard" class="nav-link">
-          Test board
-        </router-link>
+        <router-link to="/Teams" class="nav-link"> Teams </router-link>
+        <!--       Test board-->
+        <router-link to="/board/1" class="nav-link"> Test board </router-link>
       </nav>
 
       <el-dropdown trigger="click" placement="bottom-end">
@@ -47,7 +37,7 @@
             </el-dropdown-item>
 
             <el-dropdown-item>
-              <el-button link @click=handleLogout>
+              <el-button link @click="handleLogout">
                 <el-icon><SwitchButton /></el-icon>
                 Logout
               </el-button>
@@ -71,20 +61,19 @@ const themeStore = useThemeStore()
 const userStore = useUserStore()
 const isDark = computed({
   get: () => themeStore.isDark,
-  set: (value) => themeStore.toggleTheme(value)
+  set: (value) => themeStore.toggleTheme(value),
 })
 
 const handleLogout = () => {
-
   userStore.logout()
   router.push('/auth')
 }
-
 </script>
 <style scoped lang="scss">
 .app-header {
   margin: 12px;
   border-radius: 12px;
+  z-index: 100000;
   height: 60px;
   background-color: var(--el-bg-color-overlay);
 
