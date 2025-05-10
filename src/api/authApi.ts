@@ -9,7 +9,7 @@ export async function login(email: string, password: string) {
 }
 
 export async function register(email: string, password: string) {
-  const response = await apiClient.post('/auth/register', { email, password })
-  return response.data // → { accessToken, email }
+  await apiClient.post('/auth/register', { email, password })
+  return await login(email, password)
 }
 
