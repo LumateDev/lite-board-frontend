@@ -19,6 +19,21 @@ const erasedStrokes = ref<Stroke[]>([])
 const strokes = ref<Stroke[]>([])
 const redoErasedStrokes = ref<Stroke[]>([])
 const undoneStrokes = ref<Stroke[]>([])
+
+const selectionStart = ref<{ x: number; y: number } | null>(null)
+const selectionRect = ref<DOMRect | null>(null)
+const selectedStrokes = ref<Stroke[]>([])
+
+type MoveAction = {
+  strokeIds: string[]
+  before: Stroke[]
+  after: Stroke[]
+}
+
+const moveHistory = ref<MoveAction[]>([])
+const redoMoveHistory = ref<MoveAction[]>([])
+
+
 //TODO : Вынести в настройки для микрочела
 const GRID_SIZE = 20
 const isDarkTheme = ref(false)
@@ -30,6 +45,9 @@ let themeObserver: MutationObserver | null = null
 let isPanning = false
 let lastPanX = 0
 let lastPanY = 0
+let isDraggingSelection = false
+let lastDragX = 0
+let lastDragY = 0
 
 function getComputedStyleVar(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -86,7 +104,6 @@ function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number) 
 function redraw() {
   const canvas = canvasRef.value
   if (!canvas || !ctx) return
-
   ctx.clearRect(0, 0, canvas.width, canvas.height)
   ctx.fillStyle = getComputedStyleVar('--el-bg-color') || '#ffffff'
   ctx.fillRect(0, 0, canvas.width, canvas.height)
@@ -95,10 +112,12 @@ function redraw() {
     drawGrid(ctx, canvas.width, canvas.height)
   }
 
+  // Подготовка трансформации
   ctx.save()
   ctx.translate(drawingStore.panX, drawingStore.panY)
   ctx.scale(drawingStore.scale, drawingStore.scale)
 
+  // Отрисовка всех штрихов
   for (const stroke of strokes.value) {
     const points = stroke.points
     if (points.length === 0) continue
@@ -124,9 +143,30 @@ function redraw() {
     }
   }
 
+  // Обводка выделенных штрихов
+  for (const stroke of selectedStrokes.value) {
+    const points = stroke.points
+    if (points.length === 0) continue
+
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    ctx.strokeStyle = 'rgba(0, 122, 255, 0.6)'
+    ctx.lineWidth = 2
+
+    ctx.beginPath()
+    ctx.moveTo(points[0].x, points[0].y)
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(points[i].x, points[i].y)
+    }
+    ctx.stroke()
+  }
 
   ctx.restore()
+
+  // Рамка выделения (в абсолютных координатах экрана)
+  drawSelectionBox(ctx)
 }
+
 
 function startDrawing(e: MouseEvent) {
   if (!ctx || drawingStore.strokeType === 'hand') return
@@ -255,6 +295,21 @@ function getCursorPosition(e: MouseEvent) {
   return { x, y }
 }
 
+function getStrokeBoundingBox(stroke: Stroke) {
+  const xs = stroke.points.map(p => p.x)
+  const ys = stroke.points.map(p => p.y)
+  const minX = Math.min(...xs)
+  const maxX = Math.max(...xs)
+  const minY = Math.min(...ys)
+  const maxY = Math.max(...ys)
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  }
+}
+
 function onWheel(e: WheelEvent) {
   e.preventDefault()
   const rect = canvasRef.value!.getBoundingClientRect()
@@ -334,6 +389,39 @@ function redo() {
   }
 }
 
+function drawSelectionBox(ctx: CanvasRenderingContext2D) {
+  if (!selectionRect.value) return
+
+  const { x, y, width, height } = selectionRect.value
+
+  ctx.save()
+  ctx.translate(drawingStore.panX, drawingStore.panY)
+  ctx.scale(drawingStore.scale, drawingStore.scale)
+
+  ctx.strokeStyle = 'rgba(0, 122, 255, 0.8)'
+  ctx.lineWidth = 1 / drawingStore.scale // адаптация толщины к зуму
+  ctx.setLineDash([5, 5])
+  ctx.strokeRect(x, y, width, height)
+
+  ctx.restore()
+}
+
+
+function updateSelectionBox(currentX: number, currentY: number) {
+  if (!selectionStart.value) return
+
+  const x1 = selectionStart.value.x
+  const y1 = selectionStart.value.y
+  const x2 = currentX
+  const y2 = currentY
+
+  const x = Math.min(x1, x2)
+  const y = Math.min(y1, y2)
+  const width = Math.abs(x1 - x2)
+  const height = Math.abs(y1 - y2)
+
+  selectionRect.value = new DOMRect(x, y, width, height)
+}
 
 // Автосмена цвета пера при переключении темы
 function updatePenColorOnThemeChange(dark: boolean) {
@@ -372,10 +460,45 @@ onMounted(() => {
 
   canvas.addEventListener('wheel', onWheel, { passive: false })
 
-  // Обработка нажатия мыши
+  // 🖱 Нажатие мыши
   canvas.addEventListener('mousedown', (e) => {
+    const { x, y } = getCursorPosition(e)
+
+    if (drawingStore.strokeType === 'select' && e.button === 0) {
+      const hit = selectedStrokes.value.some(stroke => {
+        const box = getStrokeBoundingBox(stroke)
+        return (
+          x >= box.x &&
+          x <= box.x + box.width &&
+          y >= box.y &&
+          y <= box.y + box.height
+        )
+      })
+
+      if (hit) {
+        isDraggingSelection = true
+        lastDragX = x
+        lastDragY = y
+
+        moveHistory.value.push({
+          strokeIds: selectedStrokes.value.map(s => JSON.stringify(s.points)),
+          before: selectedStrokes.value.map(s => ({
+            ...s,
+            points: s.points.map(p => ({ ...p })),
+          })),
+          after: [],
+        })
+
+        return
+      }
+
+      // рамка выделения
+      selectionStart.value = { x, y }
+      selectionRect.value = null
+      return
+    }
+
     if (e.button === 2) {
-      // ПКМ — временная "рука"
       e.preventDefault()
       drawingStore.setTempHand(true)
       isPanning = true
@@ -386,7 +509,6 @@ onMounted(() => {
       lastPanX = e.clientX
       lastPanY = e.clientY
     } else {
-      // ЛКМ — любой другой инструмент, включая ластик
       drawing = true
       if (!drawingStore.eraser) {
         startDrawing(e)
@@ -395,8 +517,33 @@ onMounted(() => {
   })
 
 
-  // Движение мыши
+  // 🖱 Движение мыши
   canvas.addEventListener('mousemove', (e) => {
+    if (drawingStore.strokeType === 'select' && isDraggingSelection) {
+      const { x, y } = getCursorPosition(e)
+      const dx = x - lastDragX
+      const dy = y - lastDragY
+
+      for (const stroke of selectedStrokes.value) {
+        for (const point of stroke.points) {
+          point.x += dx
+          point.y += dy
+        }
+      }
+
+      lastDragX = x
+      lastDragY = y
+      redraw()
+      return
+    }
+
+    if (drawingStore.strokeType === 'select' && selectionStart.value) {
+      const { x, y } = getCursorPosition(e)
+      updateSelectionBox(x, y)
+      redraw()
+      return
+    }
+
     if (isPanning) {
       const dx = e.clientX - lastPanX
       const dy = e.clientY - lastPanY
@@ -413,13 +560,45 @@ onMounted(() => {
   })
 
 
-  // Отпускание кнопок
+
+  // 🖱 Отпускание кнопки мыши
   canvas.addEventListener('mouseup', (e) => {
     if (e.button === 2) {
-      // Завершение временной "руки"
       e.preventDefault()
-      drawingStore.setTempHand(false) // Снять подсветку "руки"
+      drawingStore.setTempHand(false)
       isPanning = false
+      return
+    }
+
+    if (drawingStore.strokeType === 'select' && isDraggingSelection) {
+      isDraggingSelection = false
+
+      const lastMove = moveHistory.value[moveHistory.value.length - 1]
+      if (lastMove) {
+        lastMove.after = selectedStrokes.value.map(s => ({
+          ...s,
+          points: s.points.map(p => ({ ...p })),
+        }))
+        redoMoveHistory.value = []
+      }
+
+      saveStrokes()
+      redraw()
+      return
+    }
+
+    if (drawingStore.strokeType === 'select' && selectionRect.value) {
+      selectedStrokes.value = strokes.value.filter((stroke) =>
+        stroke.points.some((p) =>
+          p.x >= selectionRect.value!.x &&
+          p.x <= selectionRect.value!.x + selectionRect.value!.width &&
+          p.y >= selectionRect.value!.y &&
+          p.y <= selectionRect.value!.y + selectionRect.value!.height
+        )
+      )
+      selectionStart.value = null
+      selectionRect.value = null
+      redraw()
       return
     }
 
@@ -427,18 +606,16 @@ onMounted(() => {
     stopDrawing()
   })
 
-  // Уход курсора с холста
+
   canvas.addEventListener('mouseleave', () => {
     isPanning = false
     stopDrawing()
   })
 
-  // Отключение контекстного меню
   canvas.addEventListener('contextmenu', (e) => e.preventDefault())
 
   window.addEventListener('resize', resizeCanvas)
 
-  // Автоинверсия при смене темы
   themeObserver = new MutationObserver(() => {
     const dark = document.documentElement.classList.contains('dark')
     isDarkTheme.value = dark

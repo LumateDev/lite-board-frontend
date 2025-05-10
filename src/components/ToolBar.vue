@@ -73,6 +73,17 @@
         :icon="Grid"
         @click="drawingStore.toggleGrid()"
       />
+      <!--Выделение-->
+      <el-tooltip content="Выделение" placement="right">
+        <el-button
+          :type="drawingStore.strokeType === 'select' ? 'primary' : 'default'"
+          @click="drawingStore.setStrokeType('select')"
+          circle
+        >
+          <el-icon><Select /></el-icon>
+        </el-button>
+      </el-tooltip>
+
       <!-- Масштаб -->
       <div class="scale-slider">
         <span class="label">Масштаб: {{ Math.round(scale * 100) }}%</span>
@@ -83,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { Delete, DeleteFilled, Pointer } from '@element-plus/icons-vue'
+import { Delete, DeleteFilled, Pointer, Select } from '@element-plus/icons-vue'
 import { useDrawingStore } from '@/stores/useDrawingStore'
 import { RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { Grid } from '@element-plus/icons-vue'
@@ -137,7 +148,7 @@ const isActive = (type: string) => {
 
   .sidebar-container {
     pointer-events: all;
-    max-width: 600px;
+    max-width: 660px;
     width: 100%;
     background-color: var(--el-bg-color);
     border: 2px solid var(--el-border-color);
