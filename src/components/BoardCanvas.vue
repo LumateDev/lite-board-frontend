@@ -5,6 +5,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
 import { useDrawingStore } from '@/stores/useDrawingStore'
+import { applyThemeColorCorrection } from '@/utils/colorChanger'
 import type { Stroke } from '@/interfaces.ts'
 import { drawGrid } from '@/utils/grid.ts'
 
@@ -380,27 +381,6 @@ function updateSelectionBox(currentX: number, currentY: number) {
   selectionRect.value = new DOMRect(x, y, width, height)
 }
 
-// Автосмена цвета пера при переключении темы
-function updatePenColorOnThemeChange(dark: boolean) {
-  // 1. Меняем текущий карандаш
-  const current = drawingStore.color.toLowerCase()
-  if (dark && current === '#000000') {
-    drawingStore.setColor('#ffffff')
-  } else if (!dark && current === '#ffffff') {
-    drawingStore.setColor('#000000')
-  }
-
-  // 2. Меняем уже нарисованные штрихи
-  for (const stroke of strokes.value) {
-    const color = stroke.color.toLowerCase()
-    if (dark && color === '#000000') {
-      stroke.color = '#ffffff'
-    } else if (!dark && color === '#ffffff') {
-      stroke.color = '#000000'
-    }
-  }
-}
-
 onMounted(() => {
   resizeCanvas()
   drawingStore.registerClear(clearCanvas)
@@ -409,7 +389,7 @@ onMounted(() => {
   loadStrokes()
 
   isDarkTheme.value = document.documentElement.classList.contains('dark')
-  updatePenColorOnThemeChange(isDarkTheme.value)
+  applyThemeColorCorrection(strokes, drawingStore, isDarkTheme.value)
   redraw()
 
   const canvas = canvasRef.value
@@ -574,9 +554,8 @@ onMounted(() => {
   window.addEventListener('resize', resizeCanvas)
 
   themeObserver = new MutationObserver(() => {
-    const dark = document.documentElement.classList.contains('dark')
-    isDarkTheme.value = dark
-    updatePenColorOnThemeChange(dark)
+    isDarkTheme.value = document.documentElement.classList.contains('dark')
+    applyThemeColorCorrection(strokes, drawingStore, isDarkTheme.value)
     redraw()
   })
 
