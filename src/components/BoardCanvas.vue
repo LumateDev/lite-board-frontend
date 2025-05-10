@@ -6,6 +6,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { useDrawingStore } from '@/stores/useDrawingStore'
 import type { Stroke } from '@/interfaces.ts'
+import { drawGrid } from '@/utils/grid.ts'
 
 
 
@@ -32,14 +33,8 @@ type MoveAction = {
 
 const moveHistory = ref<MoveAction[]>([])
 const redoMoveHistory = ref<MoveAction[]>([])
-
-
-//TODO : Вынести в настройки для микрочела
-const GRID_SIZE = 20
 const isDarkTheme = ref(false)
-
 const drawingStore = useDrawingStore()
-
 let themeObserver: MutationObserver | null = null
 
 let isPanning = false
@@ -53,54 +48,6 @@ function getComputedStyleVar(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
-function drawGrid(ctx: CanvasRenderingContext2D, width: number, height: number) {
-  const thinLineColor = getComputedStyleVar('--el-border-color-lighter') || '#ccc'
-  const boldLineColor = getComputedStyleVar('--el-border-color') || '#999'
-
-  const baseGridSize = GRID_SIZE // логический размер, напр. 100
-  const minPixelSpacing = 20 // минимальный размер сетки на экране
-
-  // адаптивный масштаб: чем меньше зум, тем реже сетка
-  let step = baseGridSize
-  while (step * drawingStore.scale < minPixelSpacing) {
-    step *= 2 // делаем сетку реже
-  }
-
-  ctx.save()
-  ctx.translate(drawingStore.panX, drawingStore.panY)
-  ctx.scale(drawingStore.scale, drawingStore.scale)
-
-  const logicalWidth = width / drawingStore.scale
-  const logicalHeight = height / drawingStore.scale
-
-  const startX = Math.floor(-drawingStore.panX / drawingStore.scale / step) * step
-  const startY = Math.floor(-drawingStore.panY / drawingStore.scale / step) * step
-
-  const endX = startX + logicalWidth + step
-  const endY = startY + logicalHeight + step
-
-  for (let x = startX; x < endX; x += step) {
-    ctx.beginPath()
-    ctx.moveTo(x, startY)
-    ctx.lineTo(x, endY)
-    ctx.strokeStyle = (x / step) % 5 === 0 ? boldLineColor : thinLineColor
-    ctx.lineWidth = 1
-    ctx.stroke()
-  }
-
-  for (let y = startY; y < endY; y += step) {
-    ctx.beginPath()
-    ctx.moveTo(startX, y)
-    ctx.lineTo(endX, y)
-    ctx.strokeStyle = (y / step) % 5 === 0 ? boldLineColor : thinLineColor
-    ctx.lineWidth = 1
-    ctx.stroke()
-  }
-
-  ctx.restore()
-}
-
-
 function redraw() {
   const canvas = canvasRef.value
   if (!canvas || !ctx) return
@@ -109,7 +56,17 @@ function redraw() {
   ctx.fillRect(0, 0, canvas.width, canvas.height)
 
   if (drawingStore.showGrid) {
-    drawGrid(ctx, canvas.width, canvas.height)
+    drawGrid(
+      ctx,
+      canvas.width,
+      canvas.height,
+      drawingStore.scale,
+      drawingStore.panX,
+      drawingStore.panY,
+      20,
+      getComputedStyleVar('--el-border-color-lighter') || '#ccc',
+      getComputedStyleVar('--el-border-color') || '#999'
+    )
   }
 
   // Подготовка трансформации
