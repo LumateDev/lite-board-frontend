@@ -37,17 +37,11 @@ import { ref } from 'vue'
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
 import {
-  ElButton,
-  ElCard,
-  ElInput,
-  ElForm,
-  ElFormItem,
-  ElLink,
   ElMessage,
   type FormItemRule,
   type FormInstance
 } from 'element-plus'
-
+import  * as authApi from '@/api/authApi'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -56,7 +50,6 @@ const email = ref('')
 const password = ref('')
 const formRef = ref<FormInstance | null>(null)
 
-// Правила валидации для формы
 const formRules: Record<string, FormItemRule[]> = {
   email: [
     { required: true, message: 'Please enter your email address', trigger: 'blur' },
@@ -67,25 +60,26 @@ const formRules: Record<string, FormItemRule[]> = {
   ]
 }
 
-// Смена режима (Login/Registration)
 const toggleMode = () => {
   isLoginMode.value = !isLoginMode.value
 }
 
-// Обработчик отправки формы
 const handleSubmit = async () => {
-  const form = formRef.value // Получаем ссылку на форму
-  form?.validate(async (valid: boolean) => { // Проверяем форму
-    if (valid) {
-      // Моковая авторизация
-      const mockToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
-      const mockEmail = email.value || 'user@example.com'
-
-      userStore.login(mockToken, mockEmail)
-      await router.push('/home')
-    } else {
-      // Используем ElMessage для вывода ошибки
+  const form = formRef.value
+  form?.validate(async (valid: boolean) => {
+    if (!valid) {
       ElMessage.error('Форма заполнена неверно!')
+      return
+    }
+
+    try {
+      const authFn = isLoginMode.value ? authApi.login : authApi.register
+      const { accessToken, email: userEmail } = await authFn(email.value, password.value)
+      userStore.login(accessToken, userEmail)
+      console.log("asdasd")
+      await router.push('/home')
+    } catch (error: never) {
+      ElMessage.error(error.response?.data?.message || 'Ошибка авторизации')
     }
   })
 }

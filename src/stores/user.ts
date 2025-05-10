@@ -7,7 +7,7 @@ interface UserState {
 
 export const useUserStore = defineStore('user', {
   state: (): UserState => ({
-    token: localStorage.getItem('token') || null,
+    token: localStorage.getItem('accessToken') || null,
     email: localStorage.getItem('email') || null
   }),
   actions: {
