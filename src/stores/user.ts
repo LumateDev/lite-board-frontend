@@ -14,13 +14,13 @@ export const useUserStore = defineStore('user', {
     login(token: string, email: string) {
       this.token = token
       this.email = email
-      localStorage.setItem('token', token)
+      localStorage.setItem('accessToken', token)
       localStorage.setItem('email', email)
     },
     logout() {
       this.token = null
       this.email = null
-      localStorage.removeItem('token')
+      localStorage.removeItem('accessToken')
       localStorage.removeItem('email')
 
     }
