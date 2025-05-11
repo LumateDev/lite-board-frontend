@@ -1,18 +1,39 @@
 <template>
-  <canvas ref="canvasRef" class="board-canvas" :style="canvasCursorStyle" />
+  <div class="board-canvas-wrapper" v-bind="$attrs">
+    <canvas ref="canvasRef" class="board-canvas" :style="canvasCursorStyle" />
+    <TextBox
+      v-for="text in texts"
+      :key="text.id"
+      v-model="text.content"
+      :id="text.id"
+      :x="text.x"
+      :y="text.y"
+      :fontSize="text.fontSize"
+      :scale="drawingStore.scale"
+      :panX="drawingStore.panX"
+      :panY="drawingStore.panY"
+      :selected="text.selected"
+      @update:x="(val) => text.x = val"
+      @update:y="(val) => text.y = val"
+    />
+
+  </div>
 </template>
 
+
 <script setup lang="ts">
-import { ref, onMounted, watch} from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useDrawingStore } from '@/stores/useDrawingStore.ts'
 import { applyThemeColorCorrection } from '@/utils/colorChanger.ts'
-import type { Stroke } from '@/interfaces.ts'
+import type { Stroke, TextBoxType } from '@/interfaces.ts'
 import { drawGrid } from '@/utils/grid.ts'
 import { useHotkeys } from '@/components/board/useHotkeys.ts'
 import { useCursorStyle } from '@/components/board/useCursorStyle.ts'
+import TextBox from './TextBox.vue'
 
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
+const texts  = computed(() => drawingStore.texts)
 let ctx: CanvasRenderingContext2D | null = null
 let drawing = false
 let currentStroke: Stroke | null = null
@@ -24,6 +45,10 @@ let moveBefore: Stroke[] | null = null
 const isDarkTheme = ref(false)
 const drawingStore = useDrawingStore()
 let themeObserver: MutationObserver | null = null
+const selectedTextBoxes = ref<TextBoxType[]>([])
+let moveBeforeTextBoxes: TextBoxType[] | null = null
+
+
 
 useHotkeys(drawingStore);
 const canvasCursorStyle = useCursorStyle()
@@ -214,7 +239,7 @@ function stopDrawing() {
       },
     })
 
-    saveStrokes()
+    saveBoard();
     currentStroke = null
   }
 
@@ -224,43 +249,55 @@ function stopDrawing() {
 
 
 
-function saveStrokes() {
+function saveBoard() {
   localStorage.setItem('board_strokes', JSON.stringify(strokes.value))
+  localStorage.setItem('board_texts', JSON.stringify(drawingStore.texts))
 }
 
-function loadStrokes() {
+function loadBoard() {
   const data = localStorage.getItem('board_strokes')
   if (data) {
     strokes.value = JSON.parse(data)
   }
+
+  const savedTexts = localStorage.getItem('board_texts')
+  if (savedTexts) {
+    drawingStore.setTexts(JSON.parse(savedTexts))
+  }
 }
 
+
 function clearCanvas() {
-  const beforeClear = strokes.value.map(s => ({
+  const beforeStrokes = strokes.value.map(s => ({
     ...s,
     points: s.points.map(p => ({ ...p })),
   }))
+  const beforeTexts = drawingStore.texts.map(t => ({ ...t }))
 
   strokes.value = []
+  drawingStore.setTexts([])
 
   drawingStore.addAction({
-    type: 'clear',
+    type: 'clearAll',
     undo: () => {
-      strokes.value = beforeClear.map(s => ({
+      strokes.value = beforeStrokes.map(s => ({
         ...s,
         points: s.points.map(p => ({ ...p })),
       }))
+      drawingStore.setTexts(beforeTexts.map(t => ({ ...t })))
       redraw()
     },
     redo: () => {
       strokes.value = []
+      drawingStore.setTexts([])
       redraw()
     },
   })
 
-  saveStrokes()
+  saveBoard()
   redraw()
 }
+
 
 
 function resizeCanvas() {
@@ -341,7 +378,7 @@ function eraseAt(x: number, y: number) {
           },
         })
 
-        saveStrokes()
+        saveBoard();
         redraw()
         return
       }
@@ -390,7 +427,7 @@ onMounted(() => {
   resizeCanvas()
   drawingStore.registerClear(clearCanvas)
 
-  loadStrokes()
+  loadBoard();
 
   isDarkTheme.value = document.documentElement.classList.contains('dark')
   applyThemeColorCorrection(strokes, drawingStore, isDarkTheme.value)
@@ -404,8 +441,31 @@ onMounted(() => {
   canvas.addEventListener('mousedown', (e) => {
     const { x, y } = getCursorPosition(e)
 
+    if (drawingStore.activeTool === 'text' && e.button === 0) {
+      const rect = canvas.getBoundingClientRect()
+      const x = (e.clientX - rect.left - drawingStore.panX) / drawingStore.scale
+      const y = (e.clientY - rect.top - drawingStore.panY) / drawingStore.scale
+
+      const id = Date.now().toString()
+      drawingStore.addTextBox({
+        id,
+        x,
+        y,
+        content: 'Enter text...',
+        fontSize: 18,
+        selected: false,
+      })
+
+      saveBoard()
+
+
+      drawingStore.setActiveTool('select')
+      return
+    }
+
+
     if (drawingStore.strokeType === 'select' && e.button === 0) {
-      const hit = selectedStrokes.value.some(stroke => {
+      const hitStroke = selectedStrokes.value.some(stroke => {
         const box = getStrokeBoundingBox(stroke)
         return (
           x >= box.x &&
@@ -415,24 +475,44 @@ onMounted(() => {
         )
       })
 
+      const hitTextBox = selectedTextBoxes.value.some(text => {
+        const textX = text.x
+        const textY = text.y
+        const width = 100 // ширина TextBox по умолчанию
+        const height = 30 // высота TextBox по умолчанию
+        return (
+          x >= textX &&
+          x <= textX + width &&
+          y >= textY &&
+          y <= textY + height
+        )
+      })
+
+      const hit = hitStroke || hitTextBox
+
       if (hit) {
         isDraggingSelection = true
         lastDragX = x
         lastDragY = y
+
         moveBefore = selectedStrokes.value.map(s => ({
           ...s,
           points: s.points.map(p => ({ ...p })),
         }))
+
+        moveBeforeTextBoxes = selectedTextBoxes.value.map(t => ({ ...t }))
         return
       }
 
-
+      // Ничего не выбрано → начинаем новое выделение
       selectedStrokes.value = []
+      selectedTextBoxes.value = []
       selectionStart.value = { x, y }
       selectionRect.value = null
       redraw()
       return
     }
+
 
     if (e.button === 2) {
       e.preventDefault()
@@ -468,11 +548,17 @@ onMounted(() => {
         }
       }
 
+      for (const box of selectedTextBoxes.value) {
+        box.x += dx
+        box.y += dy
+      }
+
       lastDragX = x
       lastDragY = y
       redraw()
       return
     }
+
 
     if (
       drawingStore.strokeType === 'select' &&
@@ -537,27 +623,64 @@ onMounted(() => {
           },
         })
       }
+      const beforeText = moveBeforeTextBoxes?.map(t => ({ ...t })) || []
+      const afterText = selectedTextBoxes.value.map(t => ({ ...t }))
+
+      if (beforeText.length > 0) {
+        drawingStore.addAction({
+          type: 'moveText',
+          undo: () => {
+            selectedTextBoxes.value.forEach((box, i) => {
+              Object.assign(box, beforeText[i])
+            })
+            saveBoard()
+          },
+          redo: () => {
+            selectedTextBoxes.value.forEach((box, i) => {
+              Object.assign(box, afterText[i])
+            })
+            saveBoard()
+          },
+        })
+      }
+
 
       moveBefore = null
-      saveStrokes()
+      saveBoard();
       redraw()
       return
     }
 
     if (drawingStore.strokeType === 'select' && selectionRect.value) {
+      const rect = selectionRect.value
+
       selectedStrokes.value = strokes.value.filter((stroke) =>
         stroke.points.some((p) =>
-          p.x >= selectionRect.value!.x &&
-          p.x <= selectionRect.value!.x + selectionRect.value!.width &&
-          p.y >= selectionRect.value!.y &&
-          p.y <= selectionRect.value!.y + selectionRect.value!.height
+          p.x >= rect.x &&
+          p.x <= rect.x + rect.width &&
+          p.y >= rect.y &&
+          p.y <= rect.y + rect.height
         )
       )
+
+      selectedTextBoxes.value = drawingStore.texts.filter((text) => {
+        const width = 100
+        const height = 30
+        return (
+          text.x + width >= rect.x &&
+          text.x <= rect.x + rect.width &&
+          text.y + height >= rect.y &&
+          text.y <= rect.y + rect.height
+        )
+      })
+
       selectionStart.value = null
       selectionRect.value = null
+      saveBoard()
       redraw()
       return
     }
+
 
     isPanning = false
     stopDrawing()
@@ -606,11 +729,13 @@ watch(
   (newType, oldType) => {
     if (oldType === 'select' && newType !== 'select') {
       selectedStrokes.value = []
+      selectedTextBoxes.value = []
       selectionRect.value = null
       redraw()
     }
   }
 )
+
 </script>
 
 <style scoped>
@@ -620,8 +745,10 @@ watch(
   left: 0;
   width: 100%;
   height: 100%;
+  overflow: hidden !important;
   display: block;
   cursor: crosshair;
+
 }
 
 </style>

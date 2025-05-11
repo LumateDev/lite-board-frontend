@@ -21,3 +21,12 @@ export interface HistoryItem {
   undo: () => void
   redo: () => void
 }
+
+export interface TextBoxType {
+  id: string
+  x: number
+  y: number
+  content: string
+  fontSize: number
+  selected: boolean
+}

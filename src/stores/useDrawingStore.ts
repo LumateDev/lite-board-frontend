@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
-import type { HistoryItem } from '@/interfaces'
+import type { HistoryItem, TextBoxType } from '@/interfaces'
+import type { ToolType } from '@/type.ts'
 
 export const useDrawingStore = defineStore('drawing', {
   state: () => ({
@@ -15,9 +16,14 @@ export const useDrawingStore = defineStore('drawing', {
     showGrid: true,
     isTempHandActive: false,
 
+    activeTool: 'pen' as ToolType,
+
     // История действий
     undoStack: [] as HistoryItem[],
     redoStack: [] as HistoryItem[],
+
+    // Текстовые блоки
+    texts: [] as TextBoxType[],
 
     // Колбэки
     clearCallback: null as (() => void) | null,
@@ -41,6 +47,11 @@ export const useDrawingStore = defineStore('drawing', {
     },
     toggleEraser() {
       this.eraser = !this.eraser
+    },
+
+    // Инструменты
+    setActiveTool(tool: ToolType) {
+      this.activeTool = tool
     },
 
     // Панорамирование и масштаб
@@ -74,6 +85,7 @@ export const useDrawingStore = defineStore('drawing', {
       this.panY = 0
       this.showGrid = true
       this.isTempHandActive = false
+      this.activeTool = 'pen'
     },
 
     // === История действий ===
@@ -103,7 +115,35 @@ export const useDrawingStore = defineStore('drawing', {
       this.redoStack = []
     },
 
-    // Колбэки
+    // === ТЕКСТОВЫЕ БЛОКИ ===
+    setTexts(texts: TextBoxType[]) {
+      this.texts = texts
+    },
+    addTextBox(text: TextBoxType) {
+      this.texts.push(text)
+    },
+    removeTextBox(id: string) {
+      this.texts = this.texts.filter(t => t.id !== id)
+    },
+    updateTextBox(id: string, patch: Partial<TextBoxType>) {
+      const box = this.texts.find(t => t.id === id)
+      if (box) Object.assign(box, patch)
+    },
+    addTextAction(text: TextBoxType) {
+      const copy = { ...text }
+      this.addTextBox(copy)
+      this.addAction({
+        type: 'addText',
+        undo: () => {
+          this.removeTextBox(copy.id)
+        },
+        redo: () => {
+          this.addTextBox(copy)
+        },
+      })
+    },
+
+    // === Колбэки ===
     registerClear(fn: () => void) {
       this.clearCallback = fn
     },

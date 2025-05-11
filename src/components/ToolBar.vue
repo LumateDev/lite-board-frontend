@@ -116,6 +116,17 @@
         </el-button>
       </el-tooltip>
 
+      <el-tooltip content="Text" placement="right">
+        <el-button
+          :type="drawingStore.activeTool === 'text' ? 'primary' : 'default'"
+          @click="() => drawingStore.setActiveTool('text')"
+          circle
+        >
+          <el-icon><Document /></el-icon>
+        </el-button>
+      </el-tooltip>
+
+
 
       <!-- Масштаб -->
       <div class="scale-slider">
@@ -127,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { Delete, DeleteFilled, Pointer, Crop } from '@element-plus/icons-vue'
+import { Delete, DeleteFilled, Pointer, Crop, Document } from '@element-plus/icons-vue'
 import { useDrawingStore } from '@/stores/useDrawingStore'
 import { RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { Grid } from '@element-plus/icons-vue'
