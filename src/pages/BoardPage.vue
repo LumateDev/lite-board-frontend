@@ -8,7 +8,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import ToolBar from '@/components/ToolBar.vue'
-import BoardCanvas from '@/components/BoardCanvas.vue'
+import BoardCanvas from '@/components/board/BoardCanvas.vue'
 
 const canvasRef = ref()
 </script>

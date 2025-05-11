@@ -1,42 +1,34 @@
 <template>
-  <canvas ref="canvasRef" class="board-canvas"></canvas>
+  <canvas ref="canvasRef" class="board-canvas" :style="canvasCursorStyle" />
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
-import { useDrawingStore } from '@/stores/useDrawingStore'
-import { applyThemeColorCorrection } from '@/utils/colorChanger'
+import { ref, onMounted, watch} from 'vue'
+import { useDrawingStore } from '@/stores/useDrawingStore.ts'
+import { applyThemeColorCorrection } from '@/utils/colorChanger.ts'
 import type { Stroke } from '@/interfaces.ts'
 import { drawGrid } from '@/utils/grid.ts'
-
+import { useHotkeys } from '@/components/board/useHotkeys.ts'
+import { useCursorStyle } from '@/components/board/useCursorStyle.ts'
 
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 let ctx: CanvasRenderingContext2D | null = null
 let drawing = false
 let currentStroke: Stroke | null = null
-const erasedStrokes = ref<Stroke[]>([])
-
-
 const strokes = ref<Stroke[]>([])
-const redoErasedStrokes = ref<Stroke[]>([])
-const undoneStrokes = ref<Stroke[]>([])
-
 const selectionStart = ref<{ x: number; y: number } | null>(null)
 const selectionRect = ref<DOMRect | null>(null)
 const selectedStrokes = ref<Stroke[]>([])
-
-type MoveAction = {
-  strokeIds: string[]
-  before: Stroke[]
-  after: Stroke[]
-}
-
-const moveHistory = ref<MoveAction[]>([])
-const redoMoveHistory = ref<MoveAction[]>([])
+let moveBefore: Stroke[] | null = null
 const isDarkTheme = ref(false)
 const drawingStore = useDrawingStore()
 let themeObserver: MutationObserver | null = null
+
+useHotkeys(drawingStore);
+const canvasCursorStyle = useCursorStyle()
+
+
 
 let isPanning = false
 let lastPanX = 0
@@ -44,6 +36,7 @@ let lastPanY = 0
 let isDraggingSelection = false
 let lastDragX = 0
 let lastDragY = 0
+
 
 function getComputedStyleVar(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -206,8 +199,21 @@ function stopDrawing() {
   }
 
   if (drawing && currentStroke) {
-    strokes.value.push(currentStroke)
-    undoneStrokes.value = []
+    const strokeCopy = { ...currentStroke, points: currentStroke.points.map(p => ({ ...p })) }
+    strokes.value.push(strokeCopy)
+
+    drawingStore.addAction({
+      type: 'draw',
+      undo: () => {
+        strokes.value.pop()
+        redraw()
+      },
+      redo: () => {
+        strokes.value.push(strokeCopy)
+        redraw()
+      },
+    })
+
     saveStrokes()
     currentStroke = null
   }
@@ -215,6 +221,7 @@ function stopDrawing() {
   drawing = false
   redraw()
 }
+
 
 
 function saveStrokes() {
@@ -229,11 +236,32 @@ function loadStrokes() {
 }
 
 function clearCanvas() {
+  const beforeClear = strokes.value.map(s => ({
+    ...s,
+    points: s.points.map(p => ({ ...p })),
+  }))
+
   strokes.value = []
-  undoneStrokes.value = []
+
+  drawingStore.addAction({
+    type: 'clear',
+    undo: () => {
+      strokes.value = beforeClear.map(s => ({
+        ...s,
+        points: s.points.map(p => ({ ...p })),
+      }))
+      redraw()
+    },
+    redo: () => {
+      strokes.value = []
+      redraw()
+    },
+  })
+
   saveStrokes()
   redraw()
 }
+
 
 function resizeCanvas() {
   const canvas = canvasRef.value
@@ -300,8 +328,19 @@ function eraseAt(x: number, y: number) {
       const dist = Math.sqrt(dx * dx + dy * dy)
       if (dist <= threshold) {
         const removed = strokes.value.splice(i, 1)[0]
-        erasedStrokes.value.push(removed)
-        undoneStrokes.value = [] // сброс redo
+
+        drawingStore.addAction({
+          type: 'erase',
+          undo: () => {
+            strokes.value.splice(i, 0, removed)
+            redraw()
+          },
+          redo: () => {
+            strokes.value = strokes.value.filter(s => s !== removed)
+            redraw()
+          },
+        })
+
         saveStrokes()
         redraw()
         return
@@ -311,41 +350,7 @@ function eraseAt(x: number, y: number) {
 }
 
 
-function undo() {
-  if (erasedStrokes.value.length > 0) {
-    const restored = erasedStrokes.value.pop()!
-    redoErasedStrokes.value.push(restored)
-    strokes.value.push(restored)
-    saveStrokes()
-    redraw()
-    return
-  }
 
-  if (strokes.value.length > 0) {
-    const last = strokes.value.pop()!
-    undoneStrokes.value.push(last)
-    saveStrokes()
-    redraw()
-  }
-}
-
-function redo() {
-  if (redoErasedStrokes.value.length > 0) {
-    const reErased = redoErasedStrokes.value.pop()!
-    strokes.value = strokes.value.filter(s => s !== reErased)
-    erasedStrokes.value.push(reErased)
-    saveStrokes()
-    redraw()
-    return
-  }
-
-  if (undoneStrokes.value.length > 0) {
-    const restored = undoneStrokes.value.pop()!
-    strokes.value.push(restored)
-    saveStrokes()
-    redraw()
-  }
-}
 
 function drawSelectionBox(ctx: CanvasRenderingContext2D) {
   if (!selectionRect.value) return
@@ -384,8 +389,7 @@ function updateSelectionBox(currentX: number, currentY: number) {
 onMounted(() => {
   resizeCanvas()
   drawingStore.registerClear(clearCanvas)
-  drawingStore.registerUndo(undo)
-  drawingStore.registerRedo(redo)
+
   loadStrokes()
 
   isDarkTheme.value = document.documentElement.classList.contains('dark')
@@ -397,7 +401,6 @@ onMounted(() => {
 
   canvas.addEventListener('wheel', onWheel, { passive: false })
 
-  // 🖱 Нажатие мыши
   canvas.addEventListener('mousedown', (e) => {
     const { x, y } = getCursorPosition(e)
 
@@ -416,22 +419,18 @@ onMounted(() => {
         isDraggingSelection = true
         lastDragX = x
         lastDragY = y
-
-        moveHistory.value.push({
-          strokeIds: selectedStrokes.value.map(s => JSON.stringify(s.points)),
-          before: selectedStrokes.value.map(s => ({
-            ...s,
-            points: s.points.map(p => ({ ...p })),
-          })),
-          after: [],
-        })
-
+        moveBefore = selectedStrokes.value.map(s => ({
+          ...s,
+          points: s.points.map(p => ({ ...p })),
+        }))
         return
       }
 
-      // рамка выделения
+
+      selectedStrokes.value = []
       selectionStart.value = { x, y }
       selectionRect.value = null
+      redraw()
       return
     }
 
@@ -454,6 +453,7 @@ onMounted(() => {
   })
 
 
+
   // 🖱 Движение мыши
   canvas.addEventListener('mousemove', (e) => {
     if (drawingStore.strokeType === 'select' && isDraggingSelection) {
@@ -474,12 +474,17 @@ onMounted(() => {
       return
     }
 
-    if (drawingStore.strokeType === 'select' && selectionStart.value) {
+    if (
+      drawingStore.strokeType === 'select' &&
+      selectionStart.value &&
+      (e.buttons & 1) // проверка: ЛКМ всё ещё зажата
+    ) {
       const { x, y } = getCursorPosition(e)
       updateSelectionBox(x, y)
       redraw()
       return
     }
+
 
     if (isPanning) {
       const dx = e.clientX - lastPanX
@@ -498,7 +503,6 @@ onMounted(() => {
 
 
 
-  // 🖱 Отпускание кнопки мыши
   canvas.addEventListener('mouseup', (e) => {
     if (e.button === 2) {
       e.preventDefault()
@@ -510,15 +514,31 @@ onMounted(() => {
     if (drawingStore.strokeType === 'select' && isDraggingSelection) {
       isDraggingSelection = false
 
-      const lastMove = moveHistory.value[moveHistory.value.length - 1]
-      if (lastMove) {
-        lastMove.after = selectedStrokes.value.map(s => ({
-          ...s,
-          points: s.points.map(p => ({ ...p })),
-        }))
-        redoMoveHistory.value = []
+      const before = moveBefore
+      const after = selectedStrokes.value.map(s => ({
+        ...s,
+        points: s.points.map(p => ({ ...p })),
+      }))
+
+      if (before) {
+        drawingStore.addAction({
+          type: 'move',
+          undo: () => {
+            selectedStrokes.value.forEach((s, idx) => {
+              s.points = before[idx].points.map(p => ({ ...p }))
+            })
+            redraw()
+          },
+          redo: () => {
+            selectedStrokes.value.forEach((s, idx) => {
+              s.points = after[idx].points.map(p => ({ ...p }))
+            })
+            redraw()
+          },
+        })
       }
 
+      moveBefore = null
       saveStrokes()
       redraw()
       return
@@ -542,6 +562,7 @@ onMounted(() => {
     isPanning = false
     stopDrawing()
   })
+
 
 
   canvas.addEventListener('mouseleave', () => {
@@ -578,6 +599,18 @@ watch(
     redraw()
   },
 )
+
+
+watch(
+  () => drawingStore.strokeType,
+  (newType, oldType) => {
+    if (oldType === 'select' && newType !== 'select') {
+      selectedStrokes.value = []
+      selectionRect.value = null
+      redraw()
+    }
+  }
+)
 </script>
 
 <style scoped>
@@ -590,4 +623,5 @@ watch(
   display: block;
   cursor: crosshair;
 }
+
 </style>

@@ -15,3 +15,9 @@ export interface Stroke {
   width: number
   type: string
 }
+
+export interface HistoryItem {
+  type: string
+  undo: () => void
+  redo: () => void
+}

@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import type { HistoryItem } from '@/interfaces'
 
 export const useDrawingStore = defineStore('drawing', {
   state: () => ({
@@ -14,6 +15,11 @@ export const useDrawingStore = defineStore('drawing', {
     showGrid: true,
     isTempHandActive: false,
 
+    // История действий
+    undoStack: [] as HistoryItem[],
+    redoStack: [] as HistoryItem[],
+
+    // Колбэки
     clearCallback: null as (() => void) | null,
     undoCallback: null as (() => void) | null,
     redoCallback: null as (() => void) | null,
@@ -22,36 +28,34 @@ export const useDrawingStore = defineStore('drawing', {
   }),
 
   actions: {
+    // Настройки рисования
     setStrokeType(type: string) {
       this.strokeType = type
       this.eraser = false
     },
-
     setColor(color: string) {
       this.color = color
     },
-
     setLineWidth(width: number) {
       this.lineWidth = width
     },
-
     toggleEraser() {
       this.eraser = !this.eraser
     },
 
+    // Панорамирование и масштаб
     setScale(value: number) {
       this.scale = Math.min(Math.max(value, 0.1), 4.0)
     },
-
     setPan(x: number, y: number) {
       this.panX = x
       this.panY = y
     },
-
     resetPan() {
       this.panX = 0
       this.panY = 0
     },
+
     setTempHand(active: boolean) {
       this.isTempHandActive = active
     },
@@ -72,6 +76,34 @@ export const useDrawingStore = defineStore('drawing', {
       this.isTempHandActive = false
     },
 
+    // === История действий ===
+    addAction(action: HistoryItem) {
+      this.undoStack.push(action)
+      this.redoStack = [] // сбрасываем redo после нового действия
+    },
+
+    undo() {
+      const action = this.undoStack.pop()
+      if (action) {
+        action.undo()
+        this.redoStack.push(action)
+      }
+    },
+
+    redo() {
+      const action = this.redoStack.pop()
+      if (action) {
+        action.redo()
+        this.undoStack.push(action)
+      }
+    },
+
+    clearHistory() {
+      this.undoStack = []
+      this.redoStack = []
+    },
+
+    // Колбэки
     registerClear(fn: () => void) {
       this.clearCallback = fn
     },
@@ -79,17 +111,13 @@ export const useDrawingStore = defineStore('drawing', {
       this.clearCallback?.()
     },
 
-    registerUndo(fn: () => void) {
-      this.undoCallback = fn
-    },
     triggerUndo() {
+      this.undo()
       this.undoCallback?.()
     },
 
-    registerRedo(fn: () => void) {
-      this.redoCallback = fn
-    },
     triggerRedo() {
+      this.redo()
       this.redoCallback?.()
     },
 

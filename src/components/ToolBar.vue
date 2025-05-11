@@ -42,47 +42,80 @@
       </el-popover>
 
       <!-- Рука -->
-      <el-button
-        circle
-        size="large"
-        :type="isHandActive ? 'primary' : 'default'"
-        :icon="Pointer"
-        @click="setStroke('hand')"
-      />
+      <el-tooltip content="Рука (Панорама)" placement="right">
+        <el-button
+          circle
+          size="large"
+          :type="isHandActive ? 'primary' : 'default'"
+          :icon="Pointer"
+          @click="setStroke('hand')"
+        />
+      </el-tooltip>
 
       <!-- Ластик -->
-      <el-button
-        circle
-        size="large"
-        :type="eraser ? 'primary' : 'default'"
-        :icon="Delete"
-        @click="toggleEraser"
-      />
+      <el-tooltip content="Ластик (E)" placement="right">
+        <el-button
+          circle
+          size="large"
+          :type="eraser ? 'primary' : 'default'"
+          :icon="Delete"
+          @click="toggleEraser"
+        />
+      </el-tooltip>
 
       <!-- Очистка -->
-      <el-button circle size="large" :icon="DeleteFilled" @click="drawingStore.triggerClear()" />
-      <el-button circle size="large" :icon="RefreshLeft" @click="drawingStore.triggerUndo()" />
+      <el-tooltip content="Очистить всё" placement="right">
+        <el-button
+          circle
+          size="large"
+          :icon="DeleteFilled"
+          @click="drawingStore.triggerClear()"
+        />
+      </el-tooltip>
+
+      <!-- Undo -->
+      <el-tooltip content="Отменить (Ctrl+Z)" placement="right">
+        <el-button
+          circle
+          size="large"
+          :icon="RefreshLeft"
+          @click="drawingStore.triggerUndo()"
+        />
+      </el-tooltip>
 
       <!-- Redo -->
-      <el-button circle size="large" :icon="RefreshRight" @click="drawingStore.triggerRedo()" />
+      <el-tooltip content="Повторить (Ctrl+Shift+Z / Ctrl+Y)" placement="right">
+        <el-button
+          circle
+          size="large"
+          :icon="RefreshRight"
+          @click="drawingStore.triggerRedo()"
+        />
+      </el-tooltip>
+
       <!-- Переключение сетки -->
-      <el-button
-        circle
-        size="large"
-        :type="drawingStore.showGrid ? 'primary' : 'default'"
-        :icon="Grid"
-        @click="drawingStore.toggleGrid()"
-      />
-      <!--Выделение-->
+      <el-tooltip content="Сетка" placement="right">
+        <el-button
+          circle
+          size="large"
+          :type="drawingStore.showGrid ? 'primary' : 'default'"
+          :icon="Grid"
+          @click="drawingStore.toggleGrid()"
+        />
+      </el-tooltip>
+
+      <!-- Выделение -->
       <el-tooltip content="Выделение" placement="right">
         <el-button
+          circle
+          size="large"
           :type="drawingStore.strokeType === 'select' ? 'primary' : 'default'"
           @click="drawingStore.setStrokeType('select')"
-          circle
         >
-          <el-icon><Select /></el-icon>
+          <el-icon><Crop /></el-icon>
         </el-button>
       </el-tooltip>
+
 
       <!-- Масштаб -->
       <div class="scale-slider">
@@ -94,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { Delete, DeleteFilled, Pointer, Select } from '@element-plus/icons-vue'
+import { Delete, DeleteFilled, Pointer, Crop } from '@element-plus/icons-vue'
 import { useDrawingStore } from '@/stores/useDrawingStore'
 import { RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { Grid } from '@element-plus/icons-vue'
