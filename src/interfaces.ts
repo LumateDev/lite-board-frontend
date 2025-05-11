@@ -30,3 +30,18 @@ export interface TextBoxType {
   fontSize: number
   selected: boolean
 }
+
+export interface Team {
+  id: number
+  name: string
+  members: TeamMember[]
+  createdAt: Date
+}
+
+export interface TeamMember {
+  id: number
+  name: string
+  email: string
+  role: 'member' | 'admin'
+  joinedAt: Date
+}
