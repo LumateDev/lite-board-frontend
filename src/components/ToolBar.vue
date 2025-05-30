@@ -118,9 +118,10 @@
 
       <el-tooltip content="Text" placement="right">
         <el-button
+          circle
+          size="large"
           :type="drawingStore.activeTool === 'text' ? 'primary' : 'default'"
           @click="() => drawingStore.setActiveTool('text')"
-          circle
         >
           <el-icon><Document /></el-icon>
         </el-button>
@@ -192,7 +193,7 @@ const isActive = (type: string) => {
 
   .sidebar-container {
     pointer-events: all;
-    max-width: 660px;
+    max-width: 760px;
     width: 100%;
     background-color: var(--el-bg-color);
     border: 2px solid var(--el-border-color);

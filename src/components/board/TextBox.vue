@@ -21,15 +21,14 @@ import {useThemeStore} from '@/stores/theme.ts'
 const drawingStore = useDrawingStore()
 const themeStore = useThemeStore()
 
-
 const wrapperStyle = computed(() => ({
-  position: 'absolute',
-  transform: `translate(${props.panX + props.x * props.scale}px, ${props.panY + props.y * props.scale}px) scale(${props.scale})`,
-  transformOrigin: 'top left',
-  fontSize: `${props.fontSize}px`,
-  padding: '4px 6px',
-  minWidth: '80px',
-  minHeight: '30px',
+  position: 'fixed',
+  left: `${props.panX + props.x * props.scale}px`,
+  top: `${props.panY + props.y * props.scale}px`,
+  fontSize: `${props.fontSize * props.scale}px`,
+  padding: `${4 * props.scale}px ${6 * props.scale}px`,
+  minWidth: `${80 * props.scale}px`,
+  minHeight: `${30 * props.scale}px`,
   background: 'transparent',
   color: 'var(--el-text-color-primary)',
   whiteSpace: 'pre-wrap',
@@ -38,6 +37,8 @@ const wrapperStyle = computed(() => ({
     ? (themeStore.isDark ? '1px solid white' : '1px solid black')
     : 'none',
   cursor: drawingStore.strokeType === 'select' ? 'move' : 'text',
+  transform: 'none', // Убираем transform
+  transformOrigin: 'top left',
 }))
 
 const handleInput = (e: Event) => {
@@ -95,7 +96,6 @@ const stopDrag = () => {
 <style scoped>
 .textbox {
   user-select: text;
-
 }
 .textbox:focus {
   outline: none !important;
