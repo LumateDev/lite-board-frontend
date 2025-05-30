@@ -30,6 +30,11 @@ import { drawGrid } from '@/utils/grid.ts'
 import { useHotkeys } from '@/components/board/useHotkeys.ts'
 import { useCursorStyle } from '@/components/board/useCursorStyle.ts'
 import TextBox from './TextBox.vue'
+import { useWebSocket } from '@/api/ws-client.ts'
+
+const { connect, send } = useWebSocket({
+  onDraw: addRemoteStroke
+})
 
 
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -62,12 +67,25 @@ let isDraggingSelection = false
 let lastDragX = 0
 let lastDragY = 0
 
+function addRemoteStroke(payload: { x: number, y: number, color: string, thickness: number }) {
+  const stroke = {
+    id: Date.now().toString(),
+    points: payload.points,
+    color: payload.color,
+    width: payload.thickness,
+    type: 'pen',
+  }
+  strokes.value.push(stroke)
+  redraw()
+}
+
 
 function getComputedStyleVar(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
 }
 
 function redraw() {
+  console.log('redraw')
   const canvas = canvasRef.value
   if (!canvas || !ctx) return
   ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -147,6 +165,7 @@ function redraw() {
 function startDrawing(e: MouseEvent) {
   if (!ctx || drawingStore.strokeType === 'hand') return
   drawing = true
+  console.log('startDrawing')
 
   const { x, y } = getCursorPosition(e)
 
@@ -226,6 +245,12 @@ function stopDrawing() {
   if (drawing && currentStroke) {
     const strokeCopy = { ...currentStroke, points: currentStroke.points.map(p => ({ ...p })) }
     strokes.value.push(strokeCopy)
+    send('draw', {
+      points: strokeCopy.points,
+      color: strokeCopy.color,
+      thickness: strokeCopy.width
+
+    })
 
     drawingStore.addAction({
       type: 'draw',
@@ -245,11 +270,13 @@ function stopDrawing() {
 
   drawing = false
   redraw()
+
 }
 
 
 
 function saveBoard() {
+
   localStorage.setItem('board_strokes', JSON.stringify(strokes.value))
   localStorage.setItem('board_texts', JSON.stringify(drawingStore.texts))
 }
@@ -424,6 +451,7 @@ function updateSelectionBox(currentX: number, currentY: number) {
 }
 
 onMounted(() => {
+  connect()
   resizeCanvas()
   drawingStore.registerClear(clearCanvas)
 

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { Team, TeamMember } from '@/interfaces'
+import { apiClient } from '@/api/axios'
 
 export const useTeamStore = defineStore('team', () => {
   // Состояние хранилища
@@ -10,47 +11,57 @@ export const useTeamStore = defineStore('team', () => {
   const error = ref<string | null>(null)
 
   // Инициализация тестовых данных (только при первом вызове)
-  const initMockData = () => {
-    if (teams.value.length > 0) return
-
-    teams.value = [
-      {
-        id: 1,
-        name: 'Основная команда',
-        members: [
-          {
-            id: 1,
-            name: 'Администратор',
-            email: 'admin@example.com',
-            role: 'admin',
-            joinedAt: new Date()
-          }
-        ],
-        createdAt: new Date()
-      },
-      {
-        id: 2,
-        name: 'Разработчики',
-        members: [
-          {
-            id: 2,
-            name: 'Разработчик',
-            email: 'dev@example.com',
-            role: 'member',
-            joinedAt: new Date()
-          }
-        ],
-        createdAt: new Date()
-      }
-    ]
-  }
+  // const initMockData = () => {
+  //   if (teams.value.length > 0) return
+  //
+  //   teams.value = [
+  //     {
+  //       id: 1,
+  //       name: 'Основная команда',
+  //       members: [
+  //         {
+  //           id: 1,
+  //           name: 'Администратор',
+  //           email: 'admin@example.com',
+  //           role: 'admin',
+  //           joinedAt: new Date()
+  //         }
+  //       ],
+  //       createdAt: new Date()
+  //     },
+  //     {
+  //       id: 2,
+  //       name: 'Разработчики',
+  //       members: [
+  //         {
+  //           id: 2,
+  //           name: 'Разработчик',
+  //           email: 'dev@example.com',
+  //           role: 'member',
+  //           joinedAt: new Date()
+  //         }
+  //       ],
+  //       createdAt: new Date()
+  //     }
+  //   ]
+  // }
 
   // Загрузка команд (с сохранением существующих данных)
   const fetchTeams = async () => {
     try {
       isLoading.value = true
       error.value = null
-      initMockData()
+      const response = await apiClient.get('auth/teams')
+      const newTeams: Team[] = response.data.map((team: any) => ({
+        ...team,
+        createdAt: new Date(team.createdAt),
+        members: team.members.map((m: any) => ({
+          ...m,
+          joinedAt: new Date(m.joinedAt)
+        }))
+      }))
+      teams.value = newTeams
+      return newTeams
     } catch (err) {
       error.value = 'Не удалось загрузить команды'
       console.error(err)
@@ -63,11 +74,12 @@ export const useTeamStore = defineStore('team', () => {
   const createTeam = async (name: string) => {
     try {
       isLoading.value = true
+      const response = await apiClient.post('auth/teams/create', { name })
       const newTeam: Team = {
-        id: Date.now(),
+        id: response.data.id,
         name,
         members: [],
-        createdAt: new Date()
+        createdAt: new Date(response.data.createdAt),
       }
       teams.value.push(newTeam)
       return newTeam

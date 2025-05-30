@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import type { HistoryItem, TextBoxType } from '@/interfaces'
+import type { HistoryItem, Stroke, TextBoxType } from '@/interfaces'
 import type { ToolType } from '@/type.ts'
 
 export const useDrawingStore = defineStore('drawing', {
@@ -31,9 +31,39 @@ export const useDrawingStore = defineStore('drawing', {
     redoCallback: null as (() => void) | null,
     saveCallback: null as (() => void) | null,
     exportCallback: null as (() => void) | null,
+
+    strokes: [] as Stroke[],
   }),
 
   actions: {
+
+    setStrokes(strokes: Stroke[]) {
+      this.strokes = strokes
+    },
+    addStroke(stroke: Stroke) {
+      this.strokes.push(stroke)
+    },
+
+    addRemoteStroke(payload: { x: number, y: number, color: string, thickness: number }) {
+      this.strokes.push({
+        points: [{ x: payload.x, y: payload.y }],
+        color: payload.color,
+        width: payload.thickness,
+        type: 'pen',
+      })
+    },
+
+    insertRemoteText(payload: { x: number, y: number, text: string, size: number, color: string }) {
+      this.addTextBox({
+        id: Date.now().toString(),
+        x: payload.x,
+        y: payload.y,
+        content: payload.text,
+        fontSize: payload.size,
+        selected: false,
+      })
+    },
+
     // Настройки рисования
     setStrokeType(type: string) {
       this.strokeType = type
