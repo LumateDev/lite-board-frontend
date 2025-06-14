@@ -16,6 +16,25 @@
       @update:x="(val) => text.x = val"
       @update:y="(val) => text.y = val"
     />
+    <!-- Курсоры других пользователей -->
+    <UserCursor
+      v-for="cursor in remoteCursors"
+      :key="cursor.userId"
+      :x="cursor.x"
+      :y="cursor.y"
+      :user-name="cursor.userName"
+      :user-color="cursor.color"
+      :pan-x="drawingStore.panX"
+      :pan-y="drawingStore.panY"
+      :scale="drawingStore.scale"
+      :is-visible="cursor.isVisible"
+    />
+    <!-- Панель активных пользователей -->
+    <ActiveUsersPanel
+      :active-users="activeUsers"
+      :connection-status="connectionStatus"
+      :current-user-email="currentUserEmail"
+    />
 
   </div>
 </template>
@@ -25,15 +44,26 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useDrawingStore } from '@/stores/useDrawingStore.ts'
 import { applyThemeColorCorrection } from '@/utils/colorChanger.ts'
-import type { Stroke, TextBoxType } from '@/interfaces.ts'
+import type { Stroke, TextBoxType, User, RemoteCursor } from '@/interfaces.ts'
 import { drawGrid } from '@/utils/grid.ts'
 import { useHotkeys } from '@/components/board/useHotkeys.ts'
 import { useCursorStyle } from '@/components/board/useCursorStyle.ts'
 import TextBox from './TextBox.vue'
 import { useWebSocket } from '@/api/ws-client.ts'
+import UserCursor from './UserCursor.vue'
+import ActiveUsersPanel from './ActiveUsersPanel.vue'
+import { useUserStore } from '@/stores/user.ts'
 
-const { connect, send } = useWebSocket({
-  onDraw: addRemoteStroke
+
+const { connect, send, sendCursorPosition, sendUserActivity, disconnect, getConnectionStatus } = useWebSocket({
+  onDraw: addRemoteStroke,
+  onCursorMove: handleRemoteCursorMove,
+  onUserJoin: handleUserJoin,
+  onUserLeave: handleUserLeave,
+  onUsersUpdate: handleUsersUpdate,
+  onConnectionChange: (status) => {
+    connectionStatus.value = status
+  }
 })
 
 
@@ -49,6 +79,21 @@ const selectedStrokes = ref<Stroke[]>([])
 let moveBefore: Stroke[] | null = null
 const isDarkTheme = ref(false)
 const drawingStore = useDrawingStore()
+
+const userStore = useUserStore()
+
+// Состояние участников и курсоров
+const activeUsers = ref<User[]>([])
+const remoteCursors = ref<RemoteCursor[]>([])
+const connectionStatus = ref<'connected' | 'connecting' | 'disconnected' | 'error'>('disconnected')
+const currentUserEmail = computed(() => userStore.email || '')
+
+// Таймеры для отслеживания активности
+let activityTimer: ReturnType<typeof setTimeout> | null = null
+
+let lastCursorSent = 0
+
+
 let themeObserver: MutationObserver | null = null
 const selectedTextBoxes = ref<TextBoxType[]>([])
 let moveBeforeTextBoxes: TextBoxType[] | null = null
@@ -79,6 +124,101 @@ function addRemoteStroke(payload: { x: number, y: number, color: string, thickne
   redraw()
 }
 
+function handleRemoteCursorMove(payload: { userId: string, x: number, y: number, email: string }) {
+  if (payload.email === currentUserEmail.value) return
+
+  const existingCursor = remoteCursors.value.find(c => c.userId === payload.userId)
+  const userColor = getUserColor(payload.email)
+
+  if (existingCursor) {
+    existingCursor.x = payload.x
+    existingCursor.y = payload.y
+    existingCursor.isVisible = true
+    existingCursor.lastUpdate = new Date()
+  } else {
+    remoteCursors.value.push({
+      userId: payload.userId,
+      userName: payload.email.split('@')[0],
+      x: payload.x,
+      y: payload.y,
+      color: userColor,
+      isVisible: true,
+      lastUpdate: new Date()
+    })
+  }
+
+  // Обновляем данные пользователя в списке активных
+  updateUserFromCursor(payload)
+}
+// Обновление данных пользователя на основе движения курсора
+function updateUserFromCursor(payload: { userId: string, x: number, y: number, email: string }) {
+  let user = activeUsers.value.find(u => u.id === payload.userId)
+
+  if (!user) {
+    // Добавляем нового пользователя
+    activeUsers.value.push({
+      id: payload.userId,
+      email: payload.email,
+      isActive: true,
+      lastActivity: new Date(),
+      cursorPosition: { x: payload.x, y: payload.y }
+    })
+  } else {
+    // Обновляем существующего
+    user.isActive = true
+    user.lastActivity = new Date()
+    user.cursorPosition = { x: payload.x, y: payload.y }
+  }
+}
+
+// Добавляем текущего пользователя в список при подключении
+function addCurrentUserToList() {
+  const currentEmail = currentUserEmail.value
+  if (!currentEmail) return
+
+  const existingUser = activeUsers.value.find(u => u.email === currentEmail)
+  if (!existingUser) {
+    activeUsers.value.push({
+      id: 'current-user',
+      email: currentEmail,
+      isActive: true,
+      lastActivity: new Date()
+    })
+  }
+}
+
+function handleUserJoin(payload: { userId: string, email: string }) {
+  const existingUser = activeUsers.value.find(u => u.id === payload.userId)
+  if (!existingUser) {
+    activeUsers.value.push({
+      id: payload.userId,
+      email: payload.email,
+      isActive: true,
+      lastActivity: new Date()
+    })
+  } else {
+    existingUser.isActive = true
+    existingUser.lastActivity = new Date()
+  }
+}
+function handleUserLeave(payload: { userId: string }) {
+  activeUsers.value = activeUsers.value.filter(u => u.id !== payload.userId)
+  remoteCursors.value = remoteCursors.value.filter(c => c.userId !== payload.userId)
+}
+
+function handleUsersUpdate(users: User[]) {
+  activeUsers.value = users
+}
+
+// Генерация цвета для пользователя
+function getUserColor(email: string): string {
+  let hash = 0
+  for (let i = 0; i < email.length; i++) {
+    hash = email.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue = Math.abs(hash) % 360
+  return `hsl(${hue}, 70%, 50%)`
+}
 
 function getComputedStyleVar(name: string) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -451,7 +591,22 @@ function updateSelectionBox(currentX: number, currentY: number) {
 }
 
 onMounted(() => {
-  connect()
+  try {
+    connect()
+    console.log('WebSocket connected successfully')
+
+    // Добавляем текущего пользователя в список
+    addCurrentUserToList()
+  } catch (error) {
+    console.error('Failed to connect to WebSocket:', error)
+    connectionStatus.value = 'error'
+
+    // Добавляем текущего пользователя даже при ошибке соединения
+    addCurrentUserToList()
+  }
+  setInterval(() => {
+    connectionStatus.value = getConnectionStatus()
+  }, 1000)
   resizeCanvas()
   drawingStore.registerClear(clearCanvas)
 
@@ -564,6 +719,15 @@ onMounted(() => {
 
   // 🖱 Движение мыши
   canvas.addEventListener('mousemove', (e) => {
+
+    // Отправка позиции курсора
+    const now = Date.now()
+    if (now - lastCursorSent > 50) { // Троттлинг
+      const { x, y } = getCursorPosition(e)
+      sendCursorPosition(x, y)
+      lastCursorSent = now
+    }
+
     if (drawingStore.strokeType === 'select' && isDraggingSelection) {
       const { x, y } = getCursorPosition(e)
       const dx = x - lastDragX
@@ -777,6 +941,12 @@ watch(
   display: block;
   cursor: crosshair;
 
+}
+.active-users-container {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 100;
 }
 
 </style>
