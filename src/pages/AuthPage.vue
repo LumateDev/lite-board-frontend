@@ -78,7 +78,7 @@ const handleSubmit = async () => {
       userStore.login(accessToken, userEmail)
       console.log("asdasd")
       await router.push('/home')
-    } catch (error: never) {
+    } catch (error: any) {
       ElMessage.error(error.response?.data?.message || 'Ошибка авторизации')
     }
   })

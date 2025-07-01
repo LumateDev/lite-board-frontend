@@ -48,8 +48,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:team', team: Team): void
-  (e: 'delete', id: number): void
-  (e: 'open', id: number): void
+  (e: 'delete', id: string): void
+  (e: 'open', id: string): void
 }>()
 
 const showEditDialog = ref(false)

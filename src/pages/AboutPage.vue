@@ -8,9 +8,9 @@ import {
 } from 'element-plus'
 import {
   Monitor,
-  Users,
+  User,
   Lightning,
-  Shield,
+  Lock,
   Edit,
   Share,
   Connection
@@ -28,7 +28,7 @@ const features = [
   },
   {
     id: 2,
-    icon: 'Users',
+    icon: 'User',
     title: 'Командная работа',
     description: 'Приглашайте участников, назначайте роли и управляйте доступом.'
   },
@@ -40,7 +40,7 @@ const features = [
   },
   {
     id: 4,
-    icon: 'Shield',
+    icon: 'Lock',
     title: 'Безопасность',
     description: 'Ваши данные защищены. Контролируйте, кто имеет доступ к доскам.'
   },

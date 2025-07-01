@@ -22,7 +22,7 @@ const drawingStore = useDrawingStore()
 const themeStore = useThemeStore()
 
 const wrapperStyle = computed(() => ({
-  position: 'fixed',
+  position: 'fixed' as const,
   left: `${props.panX + props.x * props.scale}px`,
   top: `${props.panY + props.y * props.scale}px`,
   fontSize: `${props.fontSize * props.scale}px`,
@@ -31,13 +31,13 @@ const wrapperStyle = computed(() => ({
   minHeight: `${30 * props.scale}px`,
   background: 'transparent',
   color: 'var(--el-text-color-primary)',
-  whiteSpace: 'pre-wrap',
+  whiteSpace: 'pre-wrap' as const,
   outline: 'none',
   border: isEditing.value
     ? (themeStore.isDark ? '1px solid white' : '1px solid black')
     : 'none',
   cursor: drawingStore.strokeType === 'select' ? 'move' : 'text',
-  transform: 'none', // Убираем transform
+  transform: 'none',
   transformOrigin: 'top left',
 }))
 

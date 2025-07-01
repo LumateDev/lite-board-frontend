@@ -39,7 +39,7 @@ const handleCreate = async (name: string) => {
   }
 }
 
-const handleDelete = async (id: number) => {
+const handleDelete = async (id: string) => {
   try {
     await teamStore.deleteTeam(id)
     ElMessage.success('Команда удалена')
@@ -49,7 +49,7 @@ const handleDelete = async (id: number) => {
   }
 }
 
-const openTeamPage = (teamId: number) => {
+const openTeamPage = (teamId: string) => {
   router.push(`/team/${teamId}`)
 }
 </script>

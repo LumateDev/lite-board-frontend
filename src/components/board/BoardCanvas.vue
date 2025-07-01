@@ -112,7 +112,7 @@ let isDraggingSelection = false
 let lastDragX = 0
 let lastDragY = 0
 
-function addRemoteStroke(payload: { x: number, y: number, color: string, thickness: number }) {
+function addRemoteStroke(payload: { points: Array<{x: number, y: number}>, color: string, thickness: number }) {
   const stroke = {
     id: Date.now().toString(),
     points: payload.points,
