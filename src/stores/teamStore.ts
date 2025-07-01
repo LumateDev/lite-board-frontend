@@ -54,9 +54,11 @@ export const useTeamStore = defineStore('team', () => {
       const response = await apiClient.get('auth/teams')
       const newTeams: Team[] = response.data.map((team: any) => ({
         ...team,
+        id: String(team.id),
         createdAt: new Date(team.createdAt),
         members: team.members.map((m: any) => ({
           ...m,
+          id: String(m.id),
           joinedAt: new Date(m.joinedAt)
         }))
       }))
@@ -76,7 +78,7 @@ export const useTeamStore = defineStore('team', () => {
       isLoading.value = true
       const response = await apiClient.post('auth/teams/create', { name })
       const newTeam: Team = {
-        id: response.data.id,
+        id: String(response.data.id),
         name,
         members: [],
         createdAt: new Date(response.data.createdAt),
@@ -93,7 +95,7 @@ export const useTeamStore = defineStore('team', () => {
   }
 
   // Удаление команды
-  const deleteTeam = async (id: number) => {
+  const deleteTeam = async (id: string) => {
     try {
       isLoading.value = true
       teams.value = teams.value.filter(team => team.id !== id)
@@ -135,13 +137,13 @@ export const useTeamStore = defineStore('team', () => {
   }
 
   // Приглашение участника
-  const inviteMember = async (teamId: number, email: string) => {
+  const inviteMember = async (teamId: string, email: string) => {
     try {
       isLoading.value = true
       const teamIndex = teams.value.findIndex(t => t.id === teamId)
       if (teamIndex !== -1) {
         const newMember: TeamMember = {
-          id: Date.now(),
+          id: String(Date.now()),
           name: email.split('@')[0],
           email,
           role: 'member',
@@ -164,7 +166,7 @@ export const useTeamStore = defineStore('team', () => {
   }
 
   // Изменение роли участника
-  const updateMemberRole = async (teamId: number, memberId: number, role: 'member' | 'admin') => {
+  const updateMemberRole = async (teamId: string, memberId: string, role: 'member' | 'admin') => {
     try {
       isLoading.value = true
       const team = teams.value.find(t => t.id === teamId)
@@ -191,7 +193,7 @@ export const useTeamStore = defineStore('team', () => {
   }
 
   // Удаление участника
-  const removeMember = async (teamId: number, memberId: number) => {
+  const removeMember = async (teamId: string, memberId: string) => {
     try {
       isLoading.value = true
       const team = teams.value.find(t => t.id === teamId)

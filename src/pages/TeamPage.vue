@@ -44,7 +44,7 @@ const formattedCreatedAt = computed(() => {
 })
 
 onMounted(async () => {
-  const teamId = Number(route.params.id)
+  const teamId = String(route.params.id)
   if (!teamId) return
 
   try {

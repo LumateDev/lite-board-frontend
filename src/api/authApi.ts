@@ -1,6 +1,6 @@
 import { apiClient } from './axios'
 
-
+// Этот файл только для auth-related API. Для команд и инвайтов используй отдельный файл teamApi.ts
 
 export async function login(email: string, password: string) {
   const response = await apiClient.post('/auth/login', { email, password })

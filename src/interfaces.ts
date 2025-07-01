@@ -1,7 +1,10 @@
 export interface Board {
-  id: number
-  name: string
-  lastUpdated: string
+  id: string
+  title: string
+  owner_id: string
+  created_at: string
+  is_public: boolean
+  lastUpdated?: string // Для обратной совместимости
 }
 
 export interface Point {
@@ -32,14 +35,14 @@ export interface TextBoxType {
 }
 
 export interface Team {
-  id: number
+  id: string
   name: string
   members: TeamMember[]
   createdAt: Date
 }
 
 export interface TeamMember {
-  id: number
+  id: string
   name: string
   email: string
   role: 'member' | 'admin'

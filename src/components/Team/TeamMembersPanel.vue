@@ -70,6 +70,7 @@ import { ref, computed } from 'vue'
 import { useTeamStore } from '@/stores/teamStore'
 import { ElMessage } from 'element-plus'
 import type { TeamMember } from '@/interfaces.ts'
+import { inviteUserToTeam } from '@/api/teamApi'
 
 const teamStore = useTeamStore()
 const showInviteDialog = ref(false)
@@ -92,7 +93,7 @@ const changeRole = async (member: TeamMember) => {
   }
 }
 
-const removeMember = async (id: number) => {
+const removeMember = async (id: string) => {
   try {
     await teamStore.removeMember(teamStore.currentTeam!.id, id)
     ElMessage.success('Участник удалён')
@@ -109,7 +110,7 @@ const sendInvite = async () => {
   }
 
   try {
-    await teamStore.inviteMember(
+    await inviteUserToTeam(
       teamStore.currentTeam!.id,
       inviteEmail.value
     )

@@ -1,6 +1,6 @@
 <template>
-  <!-- Проверяем, если текущий путь не /auth и не error, показываем AppHeader -->
-  <AppHeader v-if="!isAuthPage && !isErrorPage" />
+  <!-- Проверяем, если текущий путь не /auth, /error и не /about, показываем AppHeader -->
+  <AppHeader v-if="!isAuthPage && !isErrorPage && !isAboutPage" />
   <router-view v-slot="{ Component }">
     <component :is="Component" v-if="!isLoading" />
     <el-skeleton v-else :rows="5" animated />
@@ -17,9 +17,10 @@ const isLoading = ref(true)
 const route = useRoute()
 const router = useRouter()
 
-// Вычисляем, является ли текущая страница страницей авторизации или ошибки
+// Вычисляем, является ли текущая страница страницей авторизации, ошибки или about
 const isAuthPage = computed(() => route.name === 'auth')
 const isErrorPage = computed(() => route.name === 'error')
+const isAboutPage = computed(() => route.name === 'about')
 
 onMounted(() => {
   // Задержка для имитации загрузки

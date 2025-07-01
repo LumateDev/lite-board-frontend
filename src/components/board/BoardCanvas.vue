@@ -417,8 +417,8 @@ function stopDrawing() {
 
 function saveBoard() {
 
-  localStorage.setItem('board_strokes', JSON.stringify(strokes.value))
-  localStorage.setItem('board_texts', JSON.stringify(drawingStore.texts))
+  // localStorage.setItem('board_strokes', JSON.stringify(strokes.value))
+  // localStorage.setItem('board_texts', JSON.stringify(drawingStore.texts))
 }
 
 function loadBoard() {
