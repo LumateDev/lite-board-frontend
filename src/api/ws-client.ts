@@ -32,7 +32,7 @@ export const useWebSocket = (options?: {
     }
 
     options?.onConnectionChange?.('connecting')
-    const url = `ws://http://89.104.68.136:8080/canvas/ws/${boardId}?token=${token}`
+    const url = `ws://89.104.68.136:8080/canvas/ws/${boardId}?token=${token}`
 
     try {
       socket = new WebSocket(url)
