@@ -998,54 +998,127 @@ onMounted(() => {
   }
 
   if (canvas) {
+    // === Touch state for pan/zoom ===
+    let lastTouchDist: number | null = null;
+    let lastTouchCenter: { x: number; y: number } | null = null;
+    let lastPanXMobile = 0;
+    let lastPanYMobile = 0;
+    let isMobilePanning = false;
+    let isPinching = false;
+
     canvas.addEventListener('touchstart', (e) => {
-      if (e.touches.length > 1) return; // только один палец
-      const touch = e.touches[0];
-      const fakeEvent = normalizeTouch(touch, canvas);
-      if (drawingStore.activeTool === 'text') {
-        const x = (touch.clientX - fakeEvent.rect.left - drawingStore.panX) / drawingStore.scale;
-        const y = (touch.clientY - fakeEvent.rect.top - drawingStore.panY) / drawingStore.scale;
-        const id = Date.now().toString();
-        drawingStore.addTextBox({
-          id,
-          x,
-          y,
-          content: 'Enter text...',
-          fontSize: 18,
-          selected: false,
-        });
-        saveBoard();
-        drawingStore.setActiveTool('select');
-        return;
-      }
-      drawing = true;
-      if (!drawingStore.eraser) {
-        // Используем только нужные поля для startDrawing
-        startDrawing({
-          clientX: fakeEvent.clientX,
-          clientY: fakeEvent.clientY,
-          button: 0,
-          preventDefault: () => {},
-        } as MouseEvent);
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        const fakeEvent = normalizeTouch(touch, canvas);
+        if (drawingStore.activeTool === 'text') {
+          const x = (touch.clientX - fakeEvent.rect.left - drawingStore.panX) / drawingStore.scale;
+          const y = (touch.clientY - fakeEvent.rect.top - drawingStore.panY) / drawingStore.scale;
+          const id = Date.now().toString();
+          drawingStore.addTextBox({
+            id,
+            x,
+            y,
+            content: 'Enter text...',
+            fontSize: 18,
+            selected: false,
+          });
+          saveBoard();
+          drawingStore.setActiveTool('select');
+          return;
+        }
+        if (drawingStore.strokeType === 'hand') {
+          // Start panning
+          isMobilePanning = true;
+          lastPanXMobile = touch.clientX;
+          lastPanYMobile = touch.clientY;
+        } else {
+          drawing = true;
+          if (!drawingStore.eraser) {
+            startDrawing({
+              clientX: fakeEvent.clientX,
+              clientY: fakeEvent.clientY,
+              button: 0,
+              preventDefault: () => {},
+            } as MouseEvent);
+          }
+        }
+      } else if (e.touches.length === 2) {
+        // Pinch-to-zoom start
+        isPinching = true;
+        isMobilePanning = false;
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        lastTouchDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        lastTouchCenter = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2,
+        };
       }
     }, { passive: false });
 
     canvas.addEventListener('touchmove', (e) => {
-      if (e.touches.length > 1) return;
-      const touch = e.touches[0];
-      const fakeEvent = normalizeTouch(touch, canvas);
-      draw({
-        clientX: fakeEvent.clientX,
-        clientY: fakeEvent.clientY,
-        button: 0,
-        preventDefault: () => {},
-      } as MouseEvent);
-      e.preventDefault();
+      if (e.touches.length === 2 && isPinching) {
+        // Pinch-to-zoom
+        const t1 = e.touches[0];
+        const t2 = e.touches[1];
+        const newDist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+        const newCenter = {
+          x: (t1.clientX + t2.clientX) / 2,
+          y: (t1.clientY + t2.clientY) / 2,
+        };
+        if (lastTouchDist && lastTouchCenter) {
+          // Масштаб
+          const scaleChange = newDist / lastTouchDist;
+          const newScale = Math.min(4, Math.max(0.1, drawingStore.scale * scaleChange));
+
+          // Центр pinch должен оставаться под пальцами
+          const worldX = (lastTouchCenter.x - drawingStore.panX) / drawingStore.scale;
+          const worldY = (lastTouchCenter.y - drawingStore.panY) / drawingStore.scale;
+          const newPanX = lastTouchCenter.x - worldX * newScale;
+          const newPanY = lastTouchCenter.y - worldY * newScale;
+
+          drawingStore.setScale(newScale);
+          drawingStore.setPan(newPanX, newPanY);
+        }
+        lastTouchDist = newDist;
+        lastTouchCenter = newCenter;
+        e.preventDefault();
+        return;
+      }
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        if (drawingStore.strokeType === 'hand' && isMobilePanning) {
+          // Панорамирование одним пальцем
+          const dx = touch.clientX - lastPanXMobile;
+          const dy = touch.clientY - lastPanYMobile;
+          drawingStore.setPan(drawingStore.panX + dx, drawingStore.panY + dy);
+          lastPanXMobile = touch.clientX;
+          lastPanYMobile = touch.clientY;
+          redraw();
+          e.preventDefault();
+          return;
+        } else if (!drawingStore.eraser && drawing) {
+          // Рисование одним пальцем
+          const fakeEvent = normalizeTouch(touch, canvas);
+          draw({
+            clientX: fakeEvent.clientX,
+            clientY: fakeEvent.clientY,
+            button: 0,
+            preventDefault: () => {},
+          } as MouseEvent);
+          e.preventDefault();
+        }
+      }
     }, { passive: false });
 
     canvas.addEventListener('touchend', (e) => {
-      drawing = false;
+      // === Исправление: stopDrawing до drawing = false ===
       stopDrawing();
+      drawing = false;
+      isMobilePanning = false;
+      isPinching = false;
+      lastTouchDist = null;
+      lastTouchCenter = null;
       e.preventDefault();
     }, { passive: false });
   }
