@@ -10,6 +10,33 @@
         <router-link to="/board/1" class="nav-link"> Test board </router-link>
       </nav>
 
+      <!-- Mobile Burger Menu -->
+      <el-dropdown
+        class="mobile-nav-dropdown"
+        trigger="click"
+        placement="bottom-start"
+      >
+        <div class="burger-menu-trigger">
+          <el-icon :size="28"><Menu /></el-icon>
+        </div>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item>
+              <router-link to="/home" class="dropdown-item">Home</router-link>
+            </el-dropdown-item>
+            <el-dropdown-item>
+              <router-link to="/about" class="dropdown-item">About</router-link>
+            </el-dropdown-item>
+            <el-dropdown-item>
+              <router-link to="/Teams" class="dropdown-item">Teams</router-link>
+            </el-dropdown-item>
+            <el-dropdown-item>
+              <router-link to="/board/1" class="dropdown-item">Test board</router-link>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+
       <div class="header-actions">
         <!-- Notifications Bell -->
         <el-dropdown
@@ -199,7 +226,8 @@ import {
   UserFilled,
   InfoFilled,
   SuccessFilled,
-  WarningFilled
+  WarningFilled,
+  Menu
 } from '@element-plus/icons-vue'
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
@@ -567,7 +595,11 @@ const handleLogout = () => {
   }
 
   .nav-links {
-    display: none;
+    display: none !important;
+  }
+
+  .mobile-nav-dropdown {
+    display: block !important;
   }
 
   .notifications-dropdown-content {
@@ -592,18 +624,21 @@ const handleLogout = () => {
   }
 }
 
-@media (max-width: 480px) {
-  .notifications-dropdown-content {
-    width: 280px;
+@media (min-width: 769px) {
+  .mobile-nav-dropdown {
+    display: none !important;
   }
+}
 
-  .notification-invitation-actions {
-    flex-direction: column;
-    gap: 6px;
-
-    .el-button {
-      width: 100%;
-    }
+.burger-menu-trigger {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+  &:hover {
+    background-color: var(--el-fill-color-light);
   }
 }
 </style>
