@@ -63,7 +63,7 @@
         />
       </el-tooltip>
 
-      <!-- Очистка -->
+      <!-- Очистка
       <el-tooltip content="Очистить всё" placement="right">
         <el-button
           circle
@@ -71,7 +71,7 @@
           :icon="DeleteFilled"
           @click="drawingStore.triggerClear()"
         />
-      </el-tooltip>
+      </el-tooltip> -->
 
       <!-- Undo -->
       <el-tooltip content="Отменить (Ctrl+Z)" placement="right">
@@ -127,7 +127,17 @@
         </el-button>
       </el-tooltip>
 
-
+      <!-- Magic Stick Выделение -->
+      <el-tooltip content="Magic Stick (Выделение области)" placement="right">
+        <el-button
+          circle
+          size="large"
+          :type="drawingStore.strokeType === 'magic-select' ? 'primary' : 'default'"
+          @click="drawingStore.setStrokeType('magic-select')"
+        >
+          <el-icon><MagicStick /></el-icon>
+        </el-button>
+      </el-tooltip>
 
       <!-- Масштаб -->
       <div class="scale-slider">
@@ -139,7 +149,7 @@
 </template>
 
 <script setup lang="ts">
-import { Delete, DeleteFilled, Pointer, Crop, Document } from '@element-plus/icons-vue'
+import { Delete, DeleteFilled, Pointer, Crop, Document, MagicStick } from '@element-plus/icons-vue'
 import { useDrawingStore } from '@/stores/useDrawingStore'
 import { RefreshLeft, RefreshRight } from '@element-plus/icons-vue'
 import { Grid } from '@element-plus/icons-vue'

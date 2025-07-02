@@ -562,14 +562,22 @@ function drawSelectionBox(ctx: CanvasRenderingContext2D) {
   const { x, y, width, height } = selectionRect.value
 
   ctx.save()
-  ctx.translate(drawingStore.panX, drawingStore.panY)
-  ctx.scale(drawingStore.scale, drawingStore.scale)
-
-  ctx.strokeStyle = 'rgba(0, 122, 255, 0.8)'
-  ctx.lineWidth = 1 / drawingStore.scale // адаптация толщины к зуму
-  ctx.setLineDash([5, 5])
+  if (drawingStore.strokeType === 'magic-select') {
+    // Фиолетовый градиент
+    const gradient = ctx.createLinearGradient(x, y, x + width, y + height)
+    gradient.addColorStop(0, '#a259ff')
+    gradient.addColorStop(1, '#6a00ff')
+    ctx.strokeStyle = gradient
+    ctx.lineWidth = 2.5
+    ctx.setLineDash([8, 4])
+    ctx.globalAlpha = 0.8
+  } else {
+    ctx.strokeStyle = '#409EFF'
+    ctx.lineWidth = 2
+    ctx.setLineDash([6, 4])
+    ctx.globalAlpha = 0.5
+  }
   ctx.strokeRect(x, y, width, height)
-
   ctx.restore()
 }
 
@@ -646,6 +654,16 @@ onMounted(() => {
       return
     }
 
+    // --- MAGIC SELECT ---
+    if (drawingStore.strokeType === 'magic-select' && e.button === 0) {
+      selectedStrokes.value = []
+      selectedTextBoxes.value = []
+      selectionStart.value = { x, y }
+      selectionRect.value = null
+      redraw()
+      return
+    }
+    // --- END MAGIC SELECT ---
 
     if (drawingStore.strokeType === 'select' && e.button === 0) {
       const hitStroke = selectedStrokes.value.some(stroke => {
@@ -677,12 +695,10 @@ onMounted(() => {
         isDraggingSelection = true
         lastDragX = x
         lastDragY = y
-
         moveBefore = selectedStrokes.value.map(s => ({
           ...s,
           points: s.points.map(p => ({ ...p })),
         }))
-
         moveBeforeTextBoxes = selectedTextBoxes.value.map(t => ({ ...t }))
         return
       }
@@ -726,6 +742,37 @@ onMounted(() => {
       const { x, y } = getCursorPosition(e)
       sendCursorPosition(x, y)
       lastCursorSent = now
+    }
+
+    if (drawingStore.strokeType === 'magic-select' && isDraggingSelection) {
+      const { x, y } = getCursorPosition(e)
+      const dx = x - lastDragX
+      const dy = y - lastDragY
+      for (const stroke of selectedStrokes.value) {
+        for (const point of stroke.points) {
+          point.x += dx
+          point.y += dy
+        }
+      }
+      for (const box of selectedTextBoxes.value) {
+        box.x += dx
+        box.y += dy
+      }
+      lastDragX = x
+      lastDragY = y
+      redraw()
+      return
+    }
+
+    if (
+      drawingStore.strokeType === 'magic-select' &&
+      selectionStart.value &&
+      (e.buttons & 1)
+    ) {
+      const { x, y } = getCursorPosition(e)
+      updateSelectionBox(x, y)
+      redraw()
+      return
     }
 
     if (drawingStore.strokeType === 'select' && isDraggingSelection) {
@@ -789,15 +836,29 @@ onMounted(() => {
       return
     }
 
-    if (drawingStore.strokeType === 'select' && isDraggingSelection) {
-      isDraggingSelection = false
+    // --- MAGIC SELECT ---
+    if (drawingStore.strokeType === 'magic-select' && selectionRect.value) {
+      const rect = selectionRect.value
+      console.log('Magic select area:', {
+        x: rect.x,
+        y: rect.y,
+        width: rect.width,
+        height: rect.height
+      })
+      selectionStart.value = null
+      selectionRect.value = null
+      redraw()
+      return
+    }
+    // --- END MAGIC SELECT ---
 
+    if (drawingStore.strokeType === 'select' && isDraggingSelection) {
+      isDraggingSelection = false;
       const before = moveBefore
       const after = selectedStrokes.value.map(s => ({
         ...s,
         points: s.points.map(p => ({ ...p })),
       }))
-
       if (before) {
         drawingStore.addAction({
           type: 'move',
@@ -817,7 +878,6 @@ onMounted(() => {
       }
       const beforeText = moveBeforeTextBoxes?.map(t => ({ ...t })) || []
       const afterText = selectedTextBoxes.value.map(t => ({ ...t }))
-
       if (beforeText.length > 0) {
         drawingStore.addAction({
           type: 'moveText',
@@ -835,10 +895,35 @@ onMounted(() => {
           },
         })
       }
-
-
       moveBefore = null
       saveBoard();
+      redraw()
+      return
+    }
+
+    if (drawingStore.strokeType === 'magic-select' && selectionRect.value) {
+      const rect = selectionRect.value
+      selectedStrokes.value = strokes.value.filter((stroke) =>
+        stroke.points.some((p) =>
+          p.x >= rect.x &&
+          p.x <= rect.x + rect.width &&
+          p.y >= rect.y &&
+          p.y <= rect.y + rect.height
+        )
+      )
+      selectedTextBoxes.value = drawingStore.texts.filter((text) => {
+        const width = 100
+        const height = 30
+        return (
+          text.x + width >= rect.x &&
+          text.x <= rect.x + rect.width &&
+          text.y + height >= rect.y &&
+          text.y <= rect.y + rect.height
+        )
+      })
+      selectionStart.value = null
+      selectionRect.value = null
+      saveBoard()
       redraw()
       return
     }
