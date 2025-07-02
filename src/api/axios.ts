@@ -1,12 +1,12 @@
 import axios from 'axios'
 
 export const apiClient = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: 'http://89.104.68.136:8080',
   withCredentials: true,
 })
 
 const refreshClient = axios.create({
-  baseURL: 'http://localhost:8080',
+  baseURL: 'http://89.104.68.136:8080',
   withCredentials: true,
 })
 
