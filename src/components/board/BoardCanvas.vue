@@ -899,6 +899,71 @@ onMounted(() => {
     attributes: true,
     attributeFilter: ['class'],
   })
+
+  // Touch events for mobile drawing
+  function normalizeTouch(touch: Touch, canvas: HTMLCanvasElement) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      button: 0, // эмулируем ЛКМ
+      preventDefault: () => {},
+      rect,
+    };
+  }
+
+  if (canvas) {
+    canvas.addEventListener('touchstart', (e) => {
+      if (e.touches.length > 1) return; // только один палец
+      const touch = e.touches[0];
+      const fakeEvent = normalizeTouch(touch, canvas);
+      if (drawingStore.activeTool === 'text') {
+        const x = (touch.clientX - fakeEvent.rect.left - drawingStore.panX) / drawingStore.scale;
+        const y = (touch.clientY - fakeEvent.rect.top - drawingStore.panY) / drawingStore.scale;
+        const id = Date.now().toString();
+        drawingStore.addTextBox({
+          id,
+          x,
+          y,
+          content: 'Enter text...',
+          fontSize: 18,
+          selected: false,
+        });
+        saveBoard();
+        drawingStore.setActiveTool('select');
+        return;
+      }
+      drawing = true;
+      if (!drawingStore.eraser) {
+        // Используем только нужные поля для startDrawing
+        startDrawing({
+          clientX: fakeEvent.clientX,
+          clientY: fakeEvent.clientY,
+          button: 0,
+          preventDefault: () => {},
+        } as MouseEvent);
+      }
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (e.touches.length > 1) return;
+      const touch = e.touches[0];
+      const fakeEvent = normalizeTouch(touch, canvas);
+      draw({
+        clientX: fakeEvent.clientX,
+        clientY: fakeEvent.clientY,
+        button: 0,
+        preventDefault: () => {},
+      } as MouseEvent);
+      e.preventDefault();
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', (e) => {
+      drawing = false;
+      stopDrawing();
+      e.preventDefault();
+    }, { passive: false });
+  }
 })
 
 watch(

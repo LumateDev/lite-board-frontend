@@ -87,14 +87,7 @@
       <div class="section-header">
         <h2 class="section-title">Ваши доски</h2>
         <div class="section-actions">
-          <el-button 
-            v-if="boards.length > 0"
-            @click="showCreateDialog = true" 
-            :icon="Plus"
-            size="small"
-          >
-            Добавить доску
-          </el-button>
+          
         </div>
       </div>
 

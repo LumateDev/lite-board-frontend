@@ -7,7 +7,7 @@
         <router-link to="/home" class="nav-link"> Home </router-link>
         <router-link to="/about" class="nav-link"> About </router-link>
         <router-link to="/Teams" class="nav-link"> Teams </router-link>
-        <router-link to="/board/1" class="nav-link"> Test board </router-link>
+        <router-link to="/board/1" class="nav-link"> Общая доска </router-link>
       </nav>
 
       <!-- Mobile Burger Menu -->
