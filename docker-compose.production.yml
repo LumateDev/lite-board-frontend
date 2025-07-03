@@ -1,0 +1,14 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.production
+    network_mode: host
+    volumes:
+      - ./backend/media:/usr/share/nginx/html/media
+    ports:
+      - "80:80"
+
+networks:
+  default:
+    driver: bridge 

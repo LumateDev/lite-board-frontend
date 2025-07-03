@@ -1,0 +1,11 @@
+## PRODUCTION ENVIRONMENT ONLY
+FROM nginx:stable-alpine
+
+# Копируем конфигурацию Nginx
+COPY nginx/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Копируем готовый билд (должен быть собран локально)
+COPY dist/ /usr/share/nginx/html/
+
+# Запускаем Nginx
+CMD ["nginx", "-g", "daemon-off;"] 
