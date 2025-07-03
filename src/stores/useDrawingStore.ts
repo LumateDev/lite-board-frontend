@@ -46,6 +46,7 @@ export const useDrawingStore = defineStore('drawing', {
 
     addRemoteStroke(payload: { x: number, y: number, color: string, thickness: number }) {
       this.strokes.push({
+        id: Date.now().toString() + Math.random(),
         points: [{ x: payload.x, y: payload.y }],
         color: payload.color,
         width: payload.thickness,

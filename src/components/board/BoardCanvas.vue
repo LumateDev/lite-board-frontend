@@ -367,6 +367,7 @@ function startDrawing(e: MouseEvent) {
     : drawingStore.color
 
   currentStroke = {
+    id: Date.now().toString() + Math.random(),
     points: [{ x, y }],
     color: strokeColor,
     width: drawingStore.lineWidth,
