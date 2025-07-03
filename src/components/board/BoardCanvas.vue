@@ -53,6 +53,7 @@ import { useWebSocket } from '@/api/ws-client.ts'
 import UserCursor from './UserCursor.vue'
 import ActiveUsersPanel from './ActiveUsersPanel.vue'
 import { useUserStore } from '@/stores/user.ts'
+import { recogniseEvents } from '@/api/recogniseApi.ts'
 
 
 const { connect, send, sendCursorPosition, sendUserActivity, disconnect, getConnectionStatus } = useWebSocket({
@@ -122,6 +123,58 @@ function addRemoteStroke(payload: { points: Array<{x: number, y: number}>, color
   }
   strokes.value.push(stroke)
   redraw()
+}
+
+// Функция для отправки выделенных штрихов на бэкенд
+async function sendMagicSelectStrokes(selectedStrokes: Stroke[]) {
+  const events = selectedStrokes.map(stroke => ({
+    type: 'draw',
+    userId: currentUserEmail.value,
+    boardId: 'current-board',
+    payload: {
+      points: stroke.points,
+      color: stroke.color,
+      thickness: stroke.width
+    },
+    timestamp: Date.now()
+  }))
+  
+  console.log('Отправляем выделенные штрихи на обработку:', events)
+  try {
+    const response = await recogniseEvents(events)
+    console.log('Получен ответ от бэкенда:', response)
+    
+    // Удаляем старые выделенные штрихи
+    selectedStrokes.forEach(stroke => {
+      const index = strokes.value.findIndex(s => s.id === stroke.id)
+      if (index !== -1) {
+        strokes.value.splice(index, 1)
+      }
+    })
+    
+    // Добавляем обработанные штрихи из ответа бэкенда
+    if (response && response.events && Array.isArray(response.events)) {
+      response.events.forEach((event: any) => {
+        if (event.type === 'draw' && event.payload) {
+          const stroke = {
+            id: event.id || Date.now().toString() + Math.random(),
+            points: event.payload.points || [],
+            color: event.payload.color || '#000000',
+            width: event.payload.thickness || 2,
+            type: 'pen',
+          } as Stroke
+          strokes.value.push(stroke)
+        }
+      })
+    }
+    
+    // Очищаем выделение
+    (selectedStrokes as any).value = []
+    redraw()
+    saveBoard()
+  } catch (e) {
+    console.error('Ошибка при распознавании:', e)
+  }
 }
 
 function handleRemoteCursorMove(payload: { userId: string, x: number, y: number, email: string }) {
@@ -839,14 +892,33 @@ onMounted(() => {
     // --- MAGIC SELECT ---
     if (drawingStore.strokeType === 'magic-select' && selectionRect.value) {
       const rect = selectionRect.value
-      console.log('Magic select area:', {
-        x: rect.x,
-        y: rect.y,
-        width: rect.width,
-        height: rect.height
+      selectedStrokes.value = strokes.value.filter((stroke) =>
+        stroke.points.some((p) =>
+          p.x >= rect.x &&
+          p.x <= rect.x + rect.width &&
+          p.y >= rect.y &&
+          p.y <= rect.y + rect.height
+        )
+      )
+      selectedTextBoxes.value = drawingStore.texts.filter((text) => {
+        const width = 100
+        const height = 30
+        return (
+          text.x + width >= rect.x &&
+          text.x <= rect.x + rect.width &&
+          text.y + height >= rect.y &&
+          text.y <= rect.y + rect.height
+        )
       })
+      
+      // Отправляем выделенные штрихи на бэкенд для обработки
+      if (selectedStrokes.value.length > 0) {
+        sendMagicSelectStrokes(selectedStrokes.value)
+      }
+      
       selectionStart.value = null
       selectionRect.value = null
+      saveBoard()
       redraw()
       return
     }
@@ -921,6 +993,12 @@ onMounted(() => {
           text.y <= rect.y + rect.height
         )
       })
+      
+      // Отправляем выделенные штрихи на бэкенд для обработки
+      if (selectedStrokes.value.length > 0) {
+        sendMagicSelectStrokes(selectedStrokes.value)
+      }
+      
       selectionStart.value = null
       selectionRect.value = null
       saveBoard()

@@ -134,8 +134,10 @@
           size="large"
           :type="drawingStore.strokeType === 'magic-select' ? 'primary' : 'default'"
           @click="drawingStore.setStrokeType('magic-select')"
+          class="magic-select-button"
         >
           <el-icon><MagicStick /></el-icon>
+          <div class="beta-badge">BETA</div>
         </el-button>
       </el-tooltip>
 
@@ -250,6 +252,42 @@ const isActive = (type: string) => {
     display: flex;
     flex-direction: column;
     align-items: center;
+  }
+
+  .magic-select-button {
+    position: relative;
+  }
+
+  .beta-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+    color: white;
+    font-size: 8px;
+    font-weight: bold;
+    padding: 2px 4px;
+    border-radius: 8px;
+    line-height: 1;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+    50% {
+      transform: scale(1.05);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
   }
 }
 </style>
