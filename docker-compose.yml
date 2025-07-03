@@ -1,13 +1,11 @@
-version: '3.8'
-
 services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.production
     network_mode: host
-    volumes:
-      - ./backend/media:/usr/share/nginx/html/media  # Монтирование медиа файлов для фронта
+    ports:
+      - "80:80"
 
 networks:
   default:

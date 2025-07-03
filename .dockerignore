@@ -12,7 +12,6 @@ README.md
 .vscode
 .idea
 *.log
-dist
 coverage
 .nyc_output
 .cache
